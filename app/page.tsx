@@ -314,28 +314,34 @@ export default function DigitalMenu() {
 
               {categories.map((category) => (
                 <TabsContent key={category} value={category}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {getProductsByCategory(category).map((item) => (
-                      <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="aspect-video relative">
+                      <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
+                        <div className="aspect-[4/3] relative bg-gray-100">
                           <img
-                            src={item.image || "/placeholder.svg"}
+                            src={item.image || "/placeholder.svg?height=240&width=320&query=delicious food dish"}
                             alt={item.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/delicious-food-dish.png"
+                            }}
                           />
                         </div>
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg">{item.name}</CardTitle>
-                              <CardDescription className="mt-1">{item.description}</CardDescription>
+                        <CardHeader className="flex-grow">
+                          <div className="flex justify-between items-start gap-3">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg leading-tight">{item.name}</CardTitle>
+                              <CardDescription className="mt-2 text-sm line-clamp-2">
+                                {item.description}
+                              </CardDescription>
                             </div>
-                            <Badge variant="secondary" className="text-lg font-bold">
+                            <Badge variant="secondary" className="text-lg font-bold whitespace-nowrap">
                               R$ {item.price.toFixed(2)}
                             </Badge>
                           </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-0">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <Button
@@ -343,11 +349,17 @@ export default function DigitalMenu() {
                                 size="sm"
                                 onClick={() => removeFromCart(item.id)}
                                 disabled={!cart[item.id]}
+                                className="h-8 w-8 p-0"
                               >
                                 <Minus className="w-4 h-4" />
                               </Button>
                               <span className="w-8 text-center font-medium">{cart[item.id] || 0}</span>
-                              <Button variant="outline" size="sm" onClick={() => addToCart(item.id)}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addToCart(item.id)}
+                                className="h-8 w-8 p-0"
+                              >
                                 <Plus className="w-4 h-4" />
                               </Button>
                             </div>
