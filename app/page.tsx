@@ -304,9 +304,12 @@ export default function DigitalMenu() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
             <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-              <TabsList className={`grid w-full grid-cols-${categories.length} mb-8`}>
+              <TabsList
+                className="grid w-full mb-8"
+                style={{ gridTemplateColumns: `repeat(${categories.length}, minmax(0, 1fr))` }}
+              >
                 {categories.map((category) => (
-                  <TabsTrigger key={category} value={category} className="text-sm">
+                  <TabsTrigger key={category} value={category} className="text-sm px-4 py-2">
                     {category}
                   </TabsTrigger>
                 ))}
@@ -314,34 +317,40 @@ export default function DigitalMenu() {
 
               {categories.map((category) => (
                 <TabsContent key={category} value={category}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {getProductsByCategory(category).map((item) => (
-                      <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
-                        <div className="aspect-[4/3] relative bg-gray-100">
+                      <Card
+                        key={item.id}
+                        className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
+                      >
+                        <div className="aspect-[4/3] relative bg-gray-100 overflow-hidden">
                           <img
                             src={item.image || "/placeholder.svg?height=240&width=320&query=delicious food dish"}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform hover:scale-105"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement
                               target.src = "/delicious-food-dish.png"
                             }}
                           />
                         </div>
-                        <CardHeader className="flex-grow">
+                        <CardHeader className="flex-grow p-4">
                           <div className="flex justify-between items-start gap-3">
-                            <div className="flex-1">
-                              <CardTitle className="text-lg leading-tight">{item.name}</CardTitle>
-                              <CardDescription className="mt-2 text-sm line-clamp-2">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-lg leading-tight truncate">{item.name}</CardTitle>
+                              <CardDescription className="mt-2 text-sm line-clamp-2 text-gray-600">
                                 {item.description}
                               </CardDescription>
                             </div>
-                            <Badge variant="secondary" className="text-lg font-bold whitespace-nowrap">
+                            <Badge
+                              variant="secondary"
+                              className="text-lg font-bold whitespace-nowrap bg-orange-100 text-orange-800"
+                            >
                               R$ {item.price.toFixed(2)}
                             </Badge>
                           </div>
                         </CardHeader>
-                        <CardContent className="pt-0">
+                        <CardContent className="pt-0 p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <Button
