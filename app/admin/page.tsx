@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,6 +35,9 @@ import {
   Package,
   MessageCircle,
   ArrowLeft,
+  Check,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -421,6 +426,15 @@ const AdminPanel = () => {
     setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true })
   }
 
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = (error) => reject(error)
+    })
+  }
+
   const addNewProduct = () => {
     if (newProduct.name && newProduct.category && newProduct.price) {
       const newId = Math.max(...products.map((p) => p.id)) + 1
@@ -432,13 +446,37 @@ const AdminPanel = () => {
           category: newProduct.category,
           price: Number.parseFloat(newProduct.price),
           description: newProduct.description,
-          image: newProduct.image || "/placeholder.svg",
+          image: newProduct.image || "/vibrant-food-dish.png",
           status: "ativo",
           stock: 0,
           visibleInMenu: newProduct.visibleInMenu,
         },
       ])
       setNewProduct({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true })
+    }
+  }
+
+  const handleNewProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        const base64 = await convertToBase64(file)
+        setNewProduct({ ...newProduct, image: base64 })
+      } catch (error) {
+        console.error("Erro ao converter imagem:", error)
+      }
+    }
+  }
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        const base64 = await convertToBase64(file)
+        setEditForm({ ...editForm, image: base64 })
+      } catch (error) {
+        console.error("Erro ao converter imagem:", error)
+      }
     }
   }
 
@@ -956,220 +994,243 @@ const AdminPanel = () => {
           </TabsContent>
 
           {/* Produtos */}
-          <TabsContent value="products">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {activeTab === "products" && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Gerenciar Produtos</h2>
+              </div>
+
               <Card>
                 <CardHeader>
-                  <CardTitle>Adicionar Produto</CardTitle>
-                  <CardDescription>Adicione novos itens ao cardápio</CardDescription>
+                  <CardTitle>Adicionar Novo Produto</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Nome do Produto</Label>
-                    <Input
-                      id="name"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
-                      placeholder="Ex: Risotto de Camarão"
-                    />
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="product-name">Nome do Produto</Label>
+                      <Input
+                        id="product-name"
+                        value={newProduct.name}
+                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                        placeholder="Nome do produto"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-category">Categoria</Label>
+                      <Select
+                        value={newProduct.category}
+                        onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="product-price">Preço (R$)</Label>
+                      <Input
+                        id="product-price"
+                        type="number"
+                        step="0.01"
+                        value={newProduct.price}
+                        onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-description">Descrição</Label>
+                      <Input
+                        id="product-description"
+                        value={newProduct.description}
+                        onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                        placeholder="Descrição do produto"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="product-image">Imagem do Produto</Label>
+                      <div className="space-y-2">
+                        <Input
+                          id="product-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleNewProductImageUpload}
+                          className="cursor-pointer"
+                        />
+                        {newProduct.image && (
+                          <div className="mt-2">
+                            <img
+                              src={newProduct.image || "/placeholder.svg"}
+                              alt="Preview"
+                              className="w-32 h-24 object-cover rounded-md border"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="md:col-span-2 flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="visible-menu"
+                        checked={newProduct.visibleInMenu}
+                        onChange={(e) => setNewProduct({ ...newProduct, visibleInMenu: e.target.checked })}
+                      />
+                      <Label htmlFor="visible-menu">Visível no cardápio</Label>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="category">Categoria</Label>
-                    <select
-                      id="category"
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, category: e.target.value }))}
-                      className="w-full p-2 border rounded-md"
-                    >
-                      <option value="">Selecione uma categoria</option>
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="price">Preço</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={newProduct.price}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, price: e.target.value }))}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Descrição</Label>
-                    <Textarea
-                      id="description"
-                      value={newProduct.description}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descrição do produto..."
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="image">URL da Imagem</Label>
-                    <Input
-                      id="image"
-                      value={newProduct.image}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, image: e.target.value }))}
-                      placeholder="/caminho-da-imagem.jpg"
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="visibleInMenu"
-                      checked={newProduct.visibleInMenu}
-                      onChange={(e) => setNewProduct((prev) => ({ ...prev, visibleInMenu: e.target.checked }))}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <Label htmlFor="visibleInMenu" className="text-sm font-medium">
-                      Visível no cardápio digital
-                    </Label>
-                  </div>
-                  <button
-                    className="w-full inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-800"
-                    style={{
-                      backgroundColor: "#2563eb !important",
-                      color: "#ffffff !important",
-                      border: "none !important",
-                    }}
-                    onClick={addNewProduct}
-                  >
+                  <Button onClick={addNewProduct} className="mt-4">
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar Produto
-                  </button>
+                  </Button>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Produtos do Cardápio</CardTitle>
-                  <CardDescription>Gerencie todos os itens do seu cardápio</CardDescription>
+                  <CardTitle>Lista de Produtos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-4">
                     {products.map((product) => (
-                      <div key={product.id}>
+                      <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
                         {editingProduct === product.id ? (
-                          <Card className="p-4 border-2 border-blue-200">
-                            <div className="space-y-3">
-                              <div>
-                                <Label>Nome</Label>
-                                <Input
-                                  value={editForm.name}
-                                  onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <Label>Categoria</Label>
-                                  <select
-                                    value={editForm.category}
-                                    onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
-                                    className="w-full p-2 border rounded-md"
-                                  >
-                                    {categories.map((category) => (
-                                      <option key={category} value={category}>
-                                        {category}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <Label>Preço</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={editForm.price}
-                                    onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <Label>Descrição</Label>
-                                <Textarea
-                                  value={editForm.description}
-                                  onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
-                                  rows={2}
-                                />
-                              </div>
-                              <div>
-                                <Label>URL da Imagem</Label>
-                                <Input
-                                  value={editForm.image}
-                                  onChange={(e) => setEditForm((prev) => ({ ...prev, image: e.target.value }))}
-                                />
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="checkbox"
-                                  id="editVisibleInMenu"
-                                  checked={editForm.visibleInMenu}
-                                  onChange={(e) =>
-                                    setEditForm((prev) => ({ ...prev, visibleInMenu: e.target.checked }))
-                                  }
-                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <Label htmlFor="editVisibleInMenu" className="text-sm font-medium">
-                                  Visível no cardápio digital
-                                </Label>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button size="sm" onClick={saveEditProduct}>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  Salvar
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={cancelEdit}>
-                                  <X className="w-4 h-4 mr-1" />
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </div>
-                          </Card>
-                        ) : (
-                          <div className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50">
-                            <div className="flex space-x-3">
-                              <img
-                                src={product.image || "/placeholder.svg"}
-                                alt={product.name}
-                                className="w-16 h-16 object-cover rounded-lg"
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label>Nome</Label>
+                              <Input
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                               />
-                              <div>
-                                <p className="font-medium text-lg">{product.name}</p>
-                                <p className="text-sm text-gray-600 mb-1">{product.description}</p>
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {product.category}
-                                  </Badge>
-                                  <span className="text-sm font-bold text-green-600">
-                                    R$ {product.price.toFixed(2)}
-                                  </span>
-                                  <Badge variant={product.visibleInMenu ? "default" : "secondary"} className="text-xs">
-                                    {product.visibleInMenu ? "Visível" : "Oculto"}
-                                  </Badge>
-                                </div>
+                            </div>
+                            <div>
+                              <Label>Categoria</Label>
+                              <Select
+                                value={editForm.category}
+                                onValueChange={(value) => setEditForm({ ...editForm, category: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map((category) => (
+                                    <SelectItem key={category} value={category}>
+                                      {category}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Preço (R$)</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editForm.price}
+                                onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label>Descrição</Label>
+                              <Input
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                              />
+                            </div>
+                            <div className="md:col-span-3">
+                              <Label>Imagem do Produto</Label>
+                              <div className="space-y-2">
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleEditImageUpload}
+                                  className="cursor-pointer"
+                                />
+                                {editForm.image && (
+                                  <div className="mt-2">
+                                    <img
+                                      src={editForm.image || "/placeholder.svg"}
+                                      alt="Preview"
+                                      className="w-32 h-24 object-cover rounded-md border"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Badge
-                                variant={product.status === "ativo" ? "default" : "secondary"}
-                                className="cursor-pointer"
-                                onClick={() => toggleProductStatus(product.id)}
-                              >
-                                {product.status}
-                              </Badge>
-                              <Button variant="outline" size="sm" onClick={() => startEditProduct(product)}>
-                                <Edit className="w-4 h-4" />
+                            <div className="md:col-span-3 flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`visible-menu-${product.id}`}
+                                checked={editForm.visibleInMenu}
+                                onChange={(e) => setEditForm({ ...editForm, visibleInMenu: e.target.checked })}
+                              />
+                              <Label htmlFor={`visible-menu-${product.id}`}>Visível no cardápio</Label>
+                            </div>
+                            <div className="md:col-span-3 flex space-x-2">
+                              <Button onClick={saveEditProduct} size="sm">
+                                <Check className="w-4 h-4 mr-1" />
+                                Salvar
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => deleteProduct(product.id)}>
-                                <Trash2 className="w-4 h-4" />
+                              <Button onClick={cancelEdit} variant="outline" size="sm">
+                                <X className="w-4 h-4 mr-1" />
+                                Cancelar
                               </Button>
                             </div>
                           </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center space-x-4">
+                              <div className="w-16 h-12 bg-gray-100 rounded-md overflow-hidden">
+                                <img
+                                  src={product.image || "/placeholder.svg?height=48&width=64&query=food"}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div>
+                                <h3 className="font-medium">{product.name}</h3>
+                                <p className="text-sm text-gray-500">{product.category}</p>
+                                <p className="text-sm font-bold">R$ {product.price.toFixed(2)}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={product.status === "ativo" ? "default" : "secondary"}>
+                                {product.status}
+                              </Badge>
+                              <Badge variant={product.visibleInMenu ? "default" : "outline"}>
+                                {product.visibleInMenu ? "Visível" : "Oculto"}
+                              </Badge>
+                              <Badge variant="outline">Estoque: {product.stock}</Badge>
+                              <Button onClick={() => startEditProduct(product)} variant="outline" size="sm">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                onClick={() => toggleProductStatus(product.id)}
+                                variant="outline"
+                                size="sm"
+                                className={product.status === "ativo" ? "text-red-600" : "text-green-600"}
+                              >
+                                {product.status === "ativo" ? (
+                                  <EyeOff className="w-4 h-4" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                onClick={() => deleteProduct(product.id)}
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </>
                         )}
                       </div>
                     ))}
@@ -1177,7 +1238,7 @@ const AdminPanel = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          )}
 
           <TabsContent value="categories" className="space-y-4">
             <div className="flex justify-between items-center">
