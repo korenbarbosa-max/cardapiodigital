@@ -182,8 +182,8 @@ const AdminPanel = () => {
   const [stockUnit, setStockUnit] = useState<"unidade" | "kilo">("unidade")
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [credentials, setCredentials] = useState({
-    username: localStorage.getItem("admin_username") || "admin",
-    password: localStorage.getItem("admin_password") || "123456",
+    username: "admin",
+    password: "123456",
   })
   const [loginForm, setLoginForm] = useState({ username: "", password: "" })
   const [showChangeCredentials, setShowChangeCredentials] = useState(false)
@@ -255,19 +255,30 @@ const AdminPanel = () => {
   })
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem("admin_authenticated")
-    const savedCredentials = localStorage.getItem("admin_credentials")
+    if (typeof window !== "undefined") {
+      const savedAuth = localStorage.getItem("admin_authenticated")
+      const savedCredentials = localStorage.getItem("admin_credentials")
+      const savedUsername = localStorage.getItem("admin_username")
+      const savedPassword = localStorage.getItem("admin_password")
 
-    if (savedAuth === "true") {
-      setIsAuthenticated(true)
-    }
+      if (savedAuth === "true") {
+        setIsAuthenticated(true)
+      }
 
-    if (savedCredentials) {
-      setCredentials(JSON.parse(savedCredentials))
+      if (savedCredentials) {
+        setCredentials(JSON.parse(savedCredentials))
+      } else if (savedUsername || savedPassword) {
+        setCredentials({
+          username: savedUsername || "admin",
+          password: savedPassword || "123456",
+        })
+      }
     }
   }, [])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const loadOrdersFromStorage = () => {
       const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
       if (storedOrders.length > 0) {
@@ -1112,7 +1123,7 @@ const AdminPanel = () => {
                               <Label>Categoria</Label>
                               <Select
                                 value={editForm.category}
-                                onValueChange={(value) => setEditForm({ ...editForm, category: value })}
+                                onChange={(value) => setEditForm({ ...editForm, category: value })}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
