@@ -166,9 +166,10 @@ const initialMenuProducts = [
 
 const paymentMethods = [
   { value: "dinheiro", label: "Dinheiro", icon: Banknote },
-  { value: "cartao_debito", label: "Cartão Débito", icon: CreditCard },
-  { value: "cartao_credito", label: "Cartão Crédito", icon: CreditCard },
+  { value: "cartao_credito", label: "Cartão de Crédito", icon: CreditCard },
+  { value: "cartao_debito", label: "Cartão de Débito", icon: CreditCard },
   { value: "pix", label: "PIX", icon: Smartphone },
+  { value: "ajuste", label: "Ajuste/Balanço", icon: Settings },
 ]
 
 const transactionTypes = [
@@ -252,6 +253,17 @@ const AdminPanel = () => {
       return saved ? JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
     }
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
+  })
+
+  const [stockBalance, setStockBalance] = useState({
+    productId: "",
+    newStock: "",
+    reason: "",
+  })
+
+  const [cashBalance, setCashBalance] = useState({
+    newBalance: "",
+    reason: "",
   })
 
   useEffect(() => {
@@ -664,6 +676,60 @@ const AdminPanel = () => {
       user: "Admin",
     }
     setStockMovements((prev) => [movement, ...prev])
+  }
+
+  const balanceStock = (productId: number, newStock: number, reason: string) => {
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+
+    const oldStock = product.stock
+    const difference = newStock - oldStock
+    const movementType = difference >= 0 ? "entrada" : "saida"
+
+    setProducts((prev) =>
+      prev.map((product) => {
+        if (product.id === productId) {
+          return { ...product, stock: newStock }
+        }
+        return product
+      }),
+    )
+
+    // Registrar movimentação de balanço
+    const movement = {
+      id: Date.now(),
+      productId,
+      productName: product.name,
+      type: "balanco" as any,
+      quantity: Math.abs(difference),
+      unit: "unidade" as any,
+      reason: `Balanço: ${reason} (${oldStock} → ${newStock})`,
+      date: new Date().toLocaleString("pt-BR"),
+      user: "Admin",
+    }
+    setStockMovements((prev) => [movement, ...prev])
+  }
+
+  const balanceCash = (newBalance: number, reason: string) => {
+    const currentBalance = cashTransactions.reduce((total, transaction) => {
+      return transaction.type === "entrada" ? total + transaction.amount : total - transaction.amount
+    }, 0)
+
+    const difference = newBalance - currentBalance
+    const transactionType = difference >= 0 ? "entrada" : "saida"
+
+    const transaction = {
+      id: `balance-${Date.now()}`,
+      type: transactionType,
+      amount: Math.abs(difference),
+      paymentMethod: "ajuste",
+      description: `Balanço de Caixa: ${reason} (R$ ${currentBalance.toFixed(2)} → R$ ${newBalance.toFixed(2)})`,
+      timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      date: new Date().toISOString().split("T")[0],
+      isAutomatic: false,
+    }
+
+    setCashTransactions((prev) => [transaction, ...prev])
   }
 
   const processOrder = (order: any) => {
@@ -1776,6 +1842,63 @@ const AdminPanel = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Balanço de Caixa</CardTitle>
+                  <CardDescription>Ajustar saldo do caixa para um valor específico</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Saldo Atual do Caixa</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      R${" "}
+                      {cashTransactions
+                        .reduce((total, transaction) => {
+                          return transaction.type === "entrada"
+                            ? total + transaction.amount
+                            : total - transaction.amount
+                        }, 0)
+                        .toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Novo Saldo do Caixa</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={cashBalance.newBalance}
+                      onChange={(e) => setCashBalance((prev) => ({ ...prev, newBalance: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Motivo do Ajuste</Label>
+                    <Textarea
+                      placeholder="Ex: Contagem física, correção de erro, ajuste inicial..."
+                      value={cashBalance.reason}
+                      onChange={(e) => setCashBalance((prev) => ({ ...prev, reason: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      if (cashBalance.newBalance && cashBalance.reason) {
+                        balanceCash(Number.parseFloat(cashBalance.newBalance), cashBalance.reason)
+                        setCashBalance({ newBalance: "", reason: "" })
+                      }
+                    }}
+                    disabled={!cashBalance.newBalance || !cashBalance.reason}
+                  >
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Fazer Balanço do Caixa
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -1804,6 +1927,7 @@ const AdminPanel = () => {
                       <select className="w-full p-2 border rounded-md" id="stock-type">
                         <option value="entrada">Entrada</option>
                         <option value="saida">Saída</option>
+                        <option value="balanco">Balanço</option>
                       </select>
                     </div>
                   </div>
@@ -1845,13 +1969,21 @@ const AdminPanel = () => {
                       const unitSelect = document.getElementById("stock-unit") as HTMLSelectElement
 
                       if (productSelect.value && quantityInput.value && reasonInput.value) {
-                        updateStock(
-                          Number.parseInt(productSelect.value),
-                          Number.parseFloat(quantityInput.value),
-                          typeSelect.value as "entrada" | "saida",
-                          reasonInput.value,
-                          unitSelect.value as "unidade" | "kilo",
-                        )
+                        if (typeSelect.value === "balanco") {
+                          balanceStock(
+                            Number.parseInt(productSelect.value),
+                            Number.parseFloat(quantityInput.value),
+                            reasonInput.value,
+                          )
+                        } else {
+                          updateStock(
+                            Number.parseInt(productSelect.value),
+                            Number.parseFloat(quantityInput.value),
+                            typeSelect.value as "entrada" | "saida",
+                            reasonInput.value,
+                            unitSelect.value as "unidade" | "kilo",
+                          )
+                        }
                         quantityInput.value = ""
                         reasonInput.value = ""
                         productSelect.value = ""
