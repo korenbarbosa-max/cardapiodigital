@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -121,6 +121,7 @@ export default function DigitalMenu() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [showOrderCompleted, setShowOrderCompleted] = useState(false)
   const [lastOrder, setLastOrder] = useState<any>(null)
+  const [products, setProducts] = useState<any[]>([])
   const [customerData, setCustomerData] = useState({
     name: "",
     phone: "",
@@ -129,7 +130,19 @@ export default function DigitalMenu() {
     observations: "",
   })
 
-  const visibleProducts = initialMenuProducts.filter((product) => product.visibleInMenu && product.status === "ativo")
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedProducts = localStorage.getItem("products")
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts))
+      } else {
+        setProducts(initialMenuProducts)
+        localStorage.setItem("products", JSON.stringify(initialMenuProducts))
+      }
+    }
+  }, [])
+
+  const visibleProducts = products.filter((product) => product.visibleInMenu && product.status === "ativo")
 
   const categories = Array.from(new Set(visibleProducts.map((product) => product.category)))
 
