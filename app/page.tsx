@@ -23,114 +23,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const initialMenuProducts = [
-  {
-    id: 1,
-    name: "Bruschetta Italiana",
-    description: "Pão italiano com tomate, manjericão e azeite",
-    category: "Entradas",
-    price: 18.9,
-    image: "/bruschetta-italiana.jpg",
-    status: "ativo",
-    stock: 25,
-    visibleInMenu: true,
-    extras: [
-      { name: "Queijo", price: 2.9 },
-      { name: "Tomate Seco", price: 1.9 },
-    ],
-  },
-  {
-    id: 2,
-    name: "Carpaccio de Salmão",
-    description: "Fatias finas de salmão com alcaparras e limão",
-    category: "Entradas",
-    price: 32.9,
-    image: "/carpaccio-salm-o.jpg",
-    status: "ativo",
-    stock: 15,
-    visibleInMenu: true,
-    extras: [],
-  },
-  {
-    id: 3,
-    name: "Risotto de Camarão",
-    description: "Risotto cremoso com camarões frescos e ervas",
-    category: "Pratos Principais",
-    price: 45.9,
-    image: "/risotto-camar-o.jpg",
-    status: "ativo",
-    stock: 20,
-    visibleInMenu: true,
-    extras: [
-      { name: "Cebola", price: 3.9 },
-      { name: "Alho", price: 2.9 },
-    ],
-  },
-  {
-    id: 4,
-    name: "Filé Mignon Grelhado",
-    description: "Filé mignon com batatas rústicas e legumes",
-    category: "Pratos Principais",
-    price: 52.9,
-    image: "/fil--mignon-grelhado.jpg",
-    status: "ativo",
-    stock: 12,
-    visibleInMenu: true,
-    extras: [],
-  },
-  {
-    id: 5,
-    name: "Salmão Grelhado",
-    description: "Salmão grelhado com quinoa e vegetais",
-    category: "Pratos Principais",
-    price: 48.9,
-    image: "/salm-o-grelhado-quinoa.jpg",
-    status: "ativo",
-    stock: 18,
-    visibleInMenu: true,
-    extras: [
-      { name: "Arroz Integral", price: 4.9 },
-      { name: "Batata Doce", price: 3.9 },
-    ],
-  },
-  {
-    id: 6,
-    name: "Suco Natural de Laranja",
-    description: "Suco fresco de laranja natural",
-    category: "Bebidas",
-    price: 8.9,
-    image: "/suco-natural-laranja.jpg",
-    status: "ativo",
-    stock: 30,
-    visibleInMenu: true,
-    extras: [],
-  },
-  {
-    id: 7,
-    name: "Refrigerante Coca-Cola",
-    description: "Coca-Cola gelada 350ml",
-    category: "Bebidas",
-    price: 5.9,
-    image: "/refrigerante-coca-cola.jpg",
-    status: "ativo",
-    stock: 50,
-    visibleInMenu: true,
-    extras: [],
-  },
-  {
-    id: 8,
-    name: "Tiramisu Italiano",
-    description: "Sobremesa italiana com café e mascarpone",
-    category: "Sobremesas",
-    price: 16.9,
-    image: "/tiramisu-italiano.jpg",
-    status: "ativo",
-    stock: 10,
-    visibleInMenu: true,
-    extras: [],
-  },
-]
-
 export default function DigitalMenu() {
   const [cart, setCart] = useState<{ [key: string]: { quantity: number; extras: { name: string; price: number }[] } }>(
     {},
@@ -143,6 +35,8 @@ export default function DigitalMenu() {
   const [showOrderCompleted, setShowOrderCompleted] = useState(false)
   const [lastOrder, setLastOrder] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
   const [customerData, setCustomerData] = useState({
     name: "",
     phone: "",
@@ -152,43 +46,61 @@ export default function DigitalMenu() {
   })
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedProducts = localStorage.getItem("menuProducts")
-      if (savedProducts) {
-        const parsedProducts = JSON.parse(savedProducts)
-        setProducts(parsedProducts)
-      } else {
-        // Se não há produtos salvos, usar produtos iniciais e salvar no localStorage
-        setProducts(initialMenuProducts)
-        localStorage.setItem("menuProducts", JSON.stringify(initialMenuProducts))
-      }
-    }
-  }, [])
+    const loadData = async () => {
+      try {
+        setLoading(true)
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      if (typeof window !== "undefined") {
+        // Load products from database
+        const productsResponse = await fetch("/api/products")
+        if (productsResponse.ok) {
+          const productsData = await productsResponse.json()
+          setProducts(productsData)
+
+          // Extract categories from products
+          const uniqueCategories = Array.from(
+            new Set(
+              productsData
+                .filter((product: any) => product.visible_in_menu && product.status === "ativo")
+                .map((product: any) => product.category),
+            ),
+          )
+          setCategories(uniqueCategories)
+
+          // Set first category as active
+          if (uniqueCategories.length > 0) {
+            setActiveCategory(uniqueCategories[0])
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error)
+        // Fallback to localStorage if API fails
         const savedProducts = localStorage.getItem("menuProducts")
         if (savedProducts) {
-          setProducts(JSON.parse(savedProducts))
+          const parsedProducts = JSON.parse(savedProducts)
+          setProducts(parsedProducts)
+          const uniqueCategories = Array.from(
+            new Set(
+              parsedProducts
+                .filter((product: any) => product.visibleInMenu && product.status === "ativo")
+                .map((product: any) => product.category),
+            ),
+          )
+          setCategories(uniqueCategories)
+          if (uniqueCategories.length > 0) {
+            setActiveCategory(uniqueCategories[0])
+          }
         }
+      } finally {
+        setLoading(false)
       }
     }
 
-    window.addEventListener("storage", handleStorageChange)
-
-    // Também verificar mudanças a cada 1 segundo para mudanças na mesma aba
-    const interval = setInterval(handleStorageChange, 1000)
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange)
-      clearInterval(interval)
-    }
+    loadData()
   }, [])
 
-  const visibleProducts = products.filter((product) => product.visibleInMenu && product.status === "ativo")
-
-  const categories = Array.from(new Set(visibleProducts.map((product) => product.category)))
+  const visibleProducts = products.filter(
+    (product) => (product.visible_in_menu || product.visibleInMenu) && product.status === "ativo",
+  )
 
   const getProductsByCategory = (category: string) => {
     return visibleProducts.filter((product) => product.category === category)
@@ -254,11 +166,10 @@ export default function DigitalMenu() {
     })
   }
 
-  const handleFinishOrder = () => {
+  const handleFinishOrder = async () => {
     if (Object.keys(cart).length === 0) return
 
-    const order = {
-      id: Date.now(),
+    const orderData = {
       items: Object.entries(cart).map(([cartKey, cartItem]) => {
         const itemId = Number.parseInt(cartKey.split("-")[0])
         const item = visibleProducts.find((item) => item.id === itemId)
@@ -273,17 +184,58 @@ export default function DigitalMenu() {
       customer: customerData,
       total: getCartTotal(),
       status: "pendente",
-      timestamp: new Date().toISOString(),
     }
 
-    const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-    existingOrders.push(order)
-    localStorage.setItem("orders", JSON.stringify(existingOrders))
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      })
 
-    setLastOrder(order)
-    setCart({})
-    setShowCheckout(false)
-    setShowOrderSuccess(true)
+      if (response.ok) {
+        const order = await response.json()
+        setLastOrder(order)
+        setCart({})
+        setShowCheckout(false)
+        setShowOrderSuccess(true)
+      } else {
+        // Fallback to localStorage if API fails
+        const order = {
+          id: Date.now(),
+          ...orderData,
+          timestamp: new Date().toISOString(),
+        }
+
+        const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+        existingOrders.push(order)
+        localStorage.setItem("orders", JSON.stringify(existingOrders))
+
+        setLastOrder(order)
+        setCart({})
+        setShowCheckout(false)
+        setShowOrderSuccess(true)
+      }
+    } catch (error) {
+      console.error("Erro ao salvar pedido:", error)
+      // Fallback to localStorage
+      const order = {
+        id: Date.now(),
+        ...orderData,
+        timestamp: new Date().toISOString(),
+      }
+
+      const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]")
+      existingOrders.push(order)
+      localStorage.setItem("orders", JSON.stringify(existingOrders))
+
+      setLastOrder(order)
+      setCart({})
+      setShowCheckout(false)
+      setShowOrderSuccess(true)
+    }
   }
 
   const sendToWhatsApp = () => {
@@ -351,6 +303,17 @@ export default function DigitalMenu() {
         observations: "",
       })
     }, 3000)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando cardápio...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
