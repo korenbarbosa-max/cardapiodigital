@@ -153,14 +153,14 @@ export default function DigitalMenu() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedProducts = localStorage.getItem("products")
+      const savedProducts = localStorage.getItem("menuProducts")
       if (savedProducts) {
         const parsedProducts = JSON.parse(savedProducts)
         setProducts(parsedProducts)
       } else {
         // Se não há produtos salvos, usar produtos iniciais e salvar no localStorage
         setProducts(initialMenuProducts)
-        localStorage.setItem("products", JSON.stringify(initialMenuProducts))
+        localStorage.setItem("menuProducts", JSON.stringify(initialMenuProducts))
       }
     }
   }, [])
@@ -168,7 +168,7 @@ export default function DigitalMenu() {
   useEffect(() => {
     const handleStorageChange = () => {
       if (typeof window !== "undefined") {
-        const savedProducts = localStorage.getItem("products")
+        const savedProducts = localStorage.getItem("menuProducts")
         if (savedProducts) {
           setProducts(JSON.parse(savedProducts))
         }
