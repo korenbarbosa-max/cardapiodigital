@@ -21,7 +21,6 @@ import {
   Printer,
   Home,
   Receipt,
-  Save,
   X,
   CreditCard,
   Banknote,
@@ -30,10 +29,6 @@ import {
   TrendingDown,
   Lock,
   LogOut,
-  User,
-  Key,
-  Package,
-  MessageCircle,
   ArrowLeft,
   Check,
   Eye,
@@ -208,8 +203,9 @@ const AdminPanel = () => {
     description: "",
     image: "",
     visibleInMenu: true,
+    extras: [] as { name: string; price: number }[], // Acréscimos disponíveis
   })
-  const [editingProduct, setEditingProduct] = useState<number | null>(null)
+
   const [editForm, setEditForm] = useState({
     name: "",
     category: "",
@@ -217,7 +213,12 @@ const AdminPanel = () => {
     description: "",
     image: "",
     visibleInMenu: true,
+    extras: [] as { name: string; price: number }[],
   })
+
+  const [newExtra, setNewExtra] = useState({ name: "", price: "" })
+  const [editExtra, setEditExtra] = useState({ name: "", price: "" })
+  const [editingProduct, setEditingProduct] = useState<number | null>(null)
 
   const [cashTransactions, setCashTransactions] = useState([
     // Transações automáticas dos pedidos
@@ -355,6 +356,12 @@ const AdminPanel = () => {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("menuProducts", JSON.stringify(products))
+    }
+  }, [products])
+
   const handleLogin = () => {
     if (loginForm.username === credentials.username && loginForm.password === credentials.password) {
       setIsAuthenticated(true)
@@ -419,6 +426,7 @@ const AdminPanel = () => {
       description: product.description,
       image: product.image,
       visibleInMenu: product.visibleInMenu,
+      extras: product.extras || [],
     })
   }
 
@@ -435,18 +443,19 @@ const AdminPanel = () => {
                 description: editForm.description,
                 image: editForm.image,
                 visibleInMenu: editForm.visibleInMenu,
+                extras: editForm.extras,
               }
             : product,
         ),
       )
       setEditingProduct(null)
-      setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true })
+      setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true, extras: [] })
     }
   }
 
   const cancelEdit = () => {
     setEditingProduct(null)
-    setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true })
+    setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true, extras: [] })
   }
 
   const convertToBase64 = (file: File): Promise<string> => {
@@ -456,6 +465,40 @@ const AdminPanel = () => {
       reader.onload = () => resolve(reader.result as string)
       reader.onerror = (error) => reject(error)
     })
+  }
+
+  const addExtraToNewProduct = () => {
+    if (newExtra.name && newExtra.price) {
+      setNewProduct((prev) => ({
+        ...prev,
+        extras: [...prev.extras, { name: newExtra.name, price: Number.parseFloat(newExtra.price) }],
+      }))
+      setNewExtra({ name: "", price: "" })
+    }
+  }
+
+  const removeExtraFromNewProduct = (index: number) => {
+    setNewProduct((prev) => ({
+      ...prev,
+      extras: prev.extras.filter((_, i) => i !== index),
+    }))
+  }
+
+  const addExtraToEditProduct = () => {
+    if (editExtra.name && editExtra.price) {
+      setEditForm((prev) => ({
+        ...prev,
+        extras: [...prev.extras, { name: editExtra.name, price: Number.parseFloat(editExtra.price) }],
+      }))
+      setEditExtra({ name: "", price: "" })
+    }
+  }
+
+  const removeExtraFromEditProduct = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      extras: prev.extras.filter((_, i) => i !== index),
+    }))
   }
 
   const addNewProduct = () => {
@@ -473,9 +516,10 @@ const AdminPanel = () => {
           status: "ativo",
           stock: 0,
           visibleInMenu: newProduct.visibleInMenu,
+          extras: newProduct.extras,
         },
       ])
-      setNewProduct({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true })
+      setNewProduct({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true, extras: [] })
     }
   }
 
@@ -526,7 +570,7 @@ const AdminPanel = () => {
         paymentMethod: newTransaction.paymentMethod,
         description: newTransaction.description,
         timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        date: new Date().toISOString().split("T")[0], // Adicionando data atual
+        date: new Date().toISOString().split("T")[0],
         isAutomatic: false,
       }
 
@@ -1160,6 +1204,51 @@ const AdminPanel = () => {
                       />
                       <Label htmlFor="visible-menu">Visível no cardápio</Label>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Acréscimos Disponíveis</Label>
+                      <div className="border rounded-lg p-4 space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nome do acréscimo (ex: Bacon)"
+                            value={newExtra.name}
+                            onChange={(e) => setNewExtra({ ...newExtra, name: e.target.value })}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Preço"
+                            value={newExtra.price}
+                            onChange={(e) => setNewExtra({ ...newExtra, price: e.target.value })}
+                            className="w-24"
+                          />
+                          <Button type="button" onClick={addExtraToNewProduct} size="sm">
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        {newProduct.extras.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Acréscimos adicionados:</p>
+                            {newProduct.extras.map((extra, index) => (
+                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                <span className="text-sm">
+                                  {extra.name} - R$ {extra.price.toFixed(2)}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeExtraFromNewProduct(index)}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <Button onClick={addNewProduct} className="mt-4">
                     <Plus className="w-4 h-4 mr-2" />
@@ -1248,6 +1337,54 @@ const AdminPanel = () => {
                               />
                               <Label htmlFor={`visible-menu-${product.id}`}>Visível no cardápio</Label>
                             </div>
+                            <div className="space-y-2">
+                              <Label>Acréscimos Disponíveis</Label>
+                              <div className="border rounded-lg p-4 space-y-3">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Nome do acréscimo (ex: Bacon)"
+                                    value={editExtra.name}
+                                    onChange={(e) => setEditExtra({ ...editExtra, name: e.target.value })}
+                                    className="flex-1"
+                                  />
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Preço"
+                                    value={editExtra.price}
+                                    onChange={(e) => setEditExtra({ ...editExtra, price: e.target.value })}
+                                    className="w-24"
+                                  />
+                                  <Button type="button" onClick={addExtraToEditProduct} size="sm">
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                </div>
+
+                                {editForm.extras.length > 0 && (
+                                  <div className="space-y-2">
+                                    <p className="text-sm font-medium">Acréscimos adicionados:</p>
+                                    {editForm.extras.map((extra, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between bg-gray-50 p-2 rounded"
+                                      >
+                                        <span className="text-sm">
+                                          {extra.name} - R$ {extra.price.toFixed(2)}
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeExtraFromEditProduct(index)}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                             <div className="md:col-span-3 flex space-x-2">
                               <Button onClick={saveEditProduct} size="sm">
                                 <Check className="w-4 h-4 mr-1" />
@@ -1271,39 +1408,26 @@ const AdminPanel = () => {
                               </div>
                               <div>
                                 <h3 className="font-medium">{product.name}</h3>
-                                <p className="text-sm text-gray-500">{product.category}</p>
-                                <p className="text-sm font-bold">R$ {product.price.toFixed(2)}</p>
+                                <p className="text-sm text-gray-500">
+                                  {product.category} - R$ {product.price.toFixed(2)}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Badge variant={product.status === "ativo" ? "default" : "secondary"}>
+                              <Badge variant={product.status === "ativo" ? "secondary" : "destructive"}>
                                 {product.status}
                               </Badge>
-                              <Badge variant={product.visibleInMenu ? "default" : "outline"}>
-                                {product.visibleInMenu ? "Visível" : "Oculto"}
-                              </Badge>
-                              <Badge variant="outline">Estoque: {product.stock}</Badge>
-                              <Button onClick={() => startEditProduct(product)} variant="outline" size="sm">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                onClick={() => toggleProductStatus(product.id)}
-                                variant="outline"
-                                size="sm"
-                                className={product.status === "ativo" ? "text-red-600" : "text-green-600"}
-                              >
+                              <Button variant="outline" size="sm" onClick={() => toggleProductStatus(product.id)}>
                                 {product.status === "ativo" ? (
                                   <EyeOff className="w-4 h-4" />
                                 ) : (
                                   <Eye className="w-4 h-4" />
                                 )}
                               </Button>
-                              <Button
-                                onClick={() => deleteProduct(product.id)}
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600"
-                              >
+                              <Button variant="outline" size="sm" onClick={() => startEditProduct(product)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => deleteProduct(product.id)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
@@ -1317,125 +1441,204 @@ const AdminPanel = () => {
             </div>
           )}
 
-          <TabsContent value="categories" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Gerenciar Categorias</h2>
-            </div>
-
-            {/* Adicionar nova categoria */}
+          {/* Categorias */}
+          <TabsContent value="categories">
             <Card>
               <CardHeader>
-                <CardTitle>Adicionar Nova Categoria</CardTitle>
+                <CardTitle>Gerenciar Categorias</CardTitle>
+                <CardDescription>Adicione, edite ou remova categorias de produtos</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nome da categoria"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                  />
-                  <button
-                    onClick={() => {
-                      if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-                        setCategories([...categories, newCategory.trim()])
-                        setNewCategory("")
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#2563eb !important",
-                      color: "white !important",
-                    }}
-                    className="px-4 py-2 rounded-md hover:opacity-90"
-                  >
-                    Adicionar
-                  </button>
+                <div className="space-y-4">
+                  <ul>
+                    {categories.map((category) => (
+                      <li key={category} className="flex items-center justify-between p-3 border rounded-md">
+                        {editingCategory === category ? (
+                          <div className="flex items-center space-x-3">
+                            <Input
+                              type="text"
+                              value={editCategoryName}
+                              onChange={(e) => setEditCategoryName(e.target.value)}
+                              placeholder="Novo nome"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setCategories(categories.map((c) => (c === category ? editCategoryName : c)))
+                                setEditingCategory(null)
+                              }}
+                            >
+                              Salvar
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingCategory(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span>{category}</span>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingCategory(category)
+                                  setEditCategoryName(category)
+                                }}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setCategories(categories.filter((c) => c !== category))}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="flex items-center space-x-3">
+                    <Input
+                      type="text"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="Nova categoria"
+                    />
+                    <Button
+                      onClick={() => {
+                        if (newCategory) {
+                          setCategories([...categories, newCategory])
+                          setNewCategory("")
+                        }
+                      }}
+                    >
+                      Adicionar
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Lista de categorias */}
+          {/* Estoque */}
+          <TabsContent value="stock">
             <Card>
               <CardHeader>
-                <CardTitle>Categorias Existentes</CardTitle>
+                <CardTitle>Gerenciar Estoque</CardTitle>
+                <CardDescription>Acompanhe e ajuste o estoque dos seus produtos</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {categories.map((category, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      {editingCategory === category ? (
-                        <div className="flex gap-2 flex-1">
-                          <Input value={editCategoryName} onChange={(e) => setEditCategoryName(e.target.value)} />
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              if (editCategoryName.trim()) {
-                                const updatedCategories = categories.map((cat) =>
-                                  cat === category ? editCategoryName.trim() : cat,
-                                )
-                                setCategories(updatedCategories)
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <Select value={stockUnit} onValueChange={(value) => setStockUnit(value as "unidade" | "kilo")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unidade">Unidade</SelectItem>
+                        <SelectItem value="kilo">Kilo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      placeholder="Alerta de estoque baixo (ex: 5)"
+                      value={stockAlert.toString()}
+                      onChange={(e) => setStockAlert(Number(e.target.value))}
+                    />
+                  </div>
 
-                                // Atualizar produtos que usam essa categoria
-                                setProducts(
-                                  products.map((product) =>
-                                    product.category === category
-                                      ? { ...product, category: editCategoryName.trim() }
-                                      : product,
-                                  ),
-                                )
-
-                                setEditingCategory(null)
-                                setEditCategoryName("")
-                              }
-                            }}
-                          >
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingCategory(null)
-                              setEditCategoryName("")
-                            }}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="font-medium">{category}</span>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingCategory(category)
-                                setEditCategoryName(category)
-                              }}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                const hasProducts = products.some((product) => product.category === category)
-                                if (hasProducts) {
-                                  alert(
-                                    "Não é possível excluir uma categoria que possui produtos. Mova os produtos para outra categoria primeiro.",
-                                  )
-                                } else {
-                                  setCategories(categories.filter((cat) => cat !== category))
-                                }
-                              }}
-                            >
-                              Excluir
-                            </Button>
-                          </div>
-                        </>
-                      )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="stock-product">Produto</Label>
+                      <Select onValueChange={(value) => setStockBalance({ ...stockBalance, productId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id.toString()}>
+                              {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ))}
+                    <div>
+                      <Label htmlFor="stock-quantity">Quantidade</Label>
+                      <Input
+                        type="number"
+                        id="stock-quantity"
+                        placeholder="Quantidade"
+                        value={stockBalance.newStock}
+                        onChange={(e) => setStockBalance({ ...stockBalance, newStock: e.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="stock-reason">Motivo</Label>
+                      <Textarea
+                        id="stock-reason"
+                        placeholder="Motivo do ajuste"
+                        value={stockBalance.reason}
+                        onChange={(e) => setStockBalance({ ...stockBalance, reason: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (stockBalance.productId && stockBalance.newStock && stockBalance.reason) {
+                        balanceStock(Number(stockBalance.productId), Number(stockBalance.newStock), stockBalance.reason)
+                        setStockBalance({ productId: "", newStock: "", reason: "" })
+                      }
+                    }}
+                  >
+                    Ajustar Estoque
+                  </Button>
+
+                  <h3 className="text-xl font-bold mt-6">Movimentação de Estoque</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Produto
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tipo
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quantidade
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Motivo
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Data
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {stockMovements.map((movement) => (
+                          <tr key={movement.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {movement.productName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{movement.type}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {movement.quantity} {movement.unit}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{movement.reason}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{movement.date}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1443,38 +1646,103 @@ const AdminPanel = () => {
 
           {/* Caixa */}
           <TabsContent value="cash">
-            <div className="space-y-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Relatório por Período</CardTitle>
-                  <CardDescription>Filtre as transações por data e gere relatórios detalhados</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Caixa</CardTitle>
+                <CardDescription>Registre entradas e saídas de dinheiro</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label>Data Inicial</Label>
-                      <Input
-                        type="date"
-                        value={reportFilters.startDate}
-                        onChange={(e) => setReportFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>Data Final</Label>
-                      <Input
-                        type="date"
-                        value={reportFilters.endDate}
-                        onChange={(e) => setReportFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>Forma de Pagamento</Label>
+                      <Label htmlFor="transaction-type">Tipo de Transação</Label>
                       <Select
-                        value={reportFilters.paymentMethod}
-                        onValueChange={(value) => setReportFilters((prev) => ({ ...prev, paymentMethod: value }))}
+                        value={newTransaction.type}
+                        onValueChange={(value) =>
+                          setNewTransaction({ ...newTransaction, type: value as "entrada" | "saida" })
+                        }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {transactionTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="transaction-payment-method">Método de Pagamento</Label>
+                      <Select
+                        value={newTransaction.paymentMethod}
+                        onValueChange={(value) => setNewTransaction({ ...newTransaction, paymentMethod: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o método" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentMethods.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="transaction-amount">Valor (R$)</Label>
+                      <Input
+                        type="number"
+                        id="transaction-amount"
+                        placeholder="Valor"
+                        value={newTransaction.amount}
+                        onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="transaction-description">Descrição</Label>
+                      <Textarea
+                        id="transaction-description"
+                        placeholder="Descrição da transação"
+                        value={newTransaction.description}
+                        onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <Button onClick={addManualTransaction}>Adicionar Transação</Button>
+
+                  <h3 className="text-xl font-bold mt-6">Relatório de Caixa</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="report-start-date">Data Inicial</Label>
+                      <Input
+                        type="date"
+                        id="report-start-date"
+                        value={reportFilters.startDate}
+                        onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="report-end-date">Data Final</Label>
+                      <Input
+                        type="date"
+                        id="report-end-date"
+                        value={reportFilters.endDate}
+                        onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="report-payment-method">Método de Pagamento</Label>
+                      <Select
+                        value={reportFilters.paymentMethod}
+                        onValueChange={(value) => setReportFilters({ ...reportFilters, paymentMethod: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="todos">Todos</SelectItem>
@@ -1487,743 +1755,165 @@ const AdminPanel = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label>Tipo de Transação</Label>
+                      <Label htmlFor="report-transaction-type">Tipo de Transação</Label>
                       <Select
                         value={reportFilters.transactionType}
-                        onValueChange={(value) => setReportFilters((prev) => ({ ...prev, transactionType: value }))}
+                        onValueChange={(value) => setReportFilters({ ...reportFilters, transactionType: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Todos" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="todos">Todos</SelectItem>
-                          <SelectItem value="entrada">Entradas</SelectItem>
-                          <SelectItem value="saida">Saídas</SelectItem>
+                          {transactionTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                      <div>
-                        <span className="text-sm text-gray-600">Entradas no Período</span>
-                        <p className="text-xl font-bold text-green-600">R$ {filteredCashSummary.entradas.toFixed(2)}</p>
-                      </div>
-                      <TrendingUp className="w-8 h-8 text-green-600" />
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
-                      <div>
-                        <span className="text-sm text-gray-600">Saídas no Período</span>
-                        <p className="text-xl font-bold text-red-600">R$ {filteredCashSummary.saidas.toFixed(2)}</p>
-                      </div>
-                      <TrendingDown className="w-8 h-8 text-red-600" />
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                      <div>
-                        <span className="text-sm text-gray-600">Saldo do Período</span>
-                        <p
-                          className={`text-xl font-bold ${filteredCashSummary.total >= 0 ? "text-blue-600" : "text-red-600"}`}
-                        >
-                          R$ {filteredCashSummary.total.toFixed(2)}
-                        </p>
-                      </div>
-                      <DollarSign className="w-8 h-8 text-blue-600" />
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <span className="text-sm text-gray-600">Total Transações</span>
-                        <p className="text-xl font-bold text-gray-700">{filteredCashSummary.transactionCount}</p>
-                        <p className="text-xs text-gray-500">
-                          {filteredCashSummary.automaticCount} automáticas • {filteredCashSummary.manualCount} manuais
-                        </p>
-                      </div>
-                      <Receipt className="w-8 h-8 text-gray-600" />
-                    </div>
+                  <div className="mt-6">
+                    <h4 className="text-lg font-bold">Resumo do Caixa</h4>
+                    <p>
+                      <strong>Total:</strong> R$ {filteredCashSummary.total.toFixed(2)}
+                    </p>
+                    <p>
+                      <strong>Entradas:</strong> R$ {filteredCashSummary.entradas.toFixed(2)}
+                    </p>
+                    <p>
+                      <strong>Saídas:</strong> R$ {filteredCashSummary.saidas.toFixed(2)}
+                    </p>
+                    <p>
+                      <strong>Número de Transações:</strong> {filteredCashSummary.transactionCount} (Automáticas:{" "}
+                      {filteredCashSummary.automaticCount}, Manuais: {filteredCashSummary.manualCount})
+                    </p>
+                    <h4 className="text-lg font-bold mt-4">Detalhes por Método de Pagamento</h4>
+                    <ul>
+                      {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
+                        <li key={method}>
+                          {paymentMethods.find((m) => m.value === method)?.label || method}: R$ {amount.toFixed(2)}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
 
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-3">Resumo por Forma de Pagamento (Período Selecionado)</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {paymentMethods.map((method) => {
-                        const amount = filteredCashSummary.byPaymentMethod[method.value] || 0
-                        const IconComponent = method.icon
-                        return (
-                          <div key={method.value} className="p-3 border rounded-lg">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <IconComponent className="w-4 h-4" />
-                              <span className="text-sm font-medium">{method.label}</span>
-                            </div>
-                            <p className={`text-lg font-bold ${amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              R$ {amount.toFixed(2)}
-                            </p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">
-                      Transações do Período ({getFilteredTransactions().length} encontradas)
-                    </h3>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {getFilteredTransactions().map((transaction) => {
-                        const PaymentIcon =
-                          paymentMethods.find((m) => m.value === transaction.paymentMethod)?.icon || Banknote
-                        const TypeIcon = transactionTypes.find((t) => t.value === transaction.type)?.icon || TrendingUp
-                        const typeColor =
-                          transactionTypes.find((t) => t.value === transaction.type)?.color || "text-gray-600"
-
-                        return (
-                          <div key={transaction.id} className="flex justify-between items-center p-3 border rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div
-                                className={`p-2 rounded-full ${transaction.type === "entrada" ? "bg-green-100" : "bg-red-100"}`}
-                              >
-                                <TypeIcon className={`w-4 h-4 ${typeColor}`} />
-                              </div>
-                              <div>
-                                <p className="font-medium">{transaction.description}</p>
-                                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                                  <PaymentIcon className="w-3 h-3" />
-                                  <span>
-                                    {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label}
-                                  </span>
-                                  <span>•</span>
-                                  <span>{transaction.date}</span>
-                                  <span>•</span>
-                                  <span>{transaction.timestamp}</span>
-                                  {transaction.isAutomatic && (
-                                    <>
-                                      <span>•</span>
-                                      <Badge variant="outline" className="text-xs">
-                                        Automático
-                                      </Badge>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p
-                                className={`font-bold ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {transaction.type === "entrada" ? "+" : "-"}R$ {transaction.amount.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {getFilteredTransactions().length === 0 && (
-                        <div className="text-center py-8 text-gray-500">
-                          <p>Nenhuma transação encontrada no período selecionado</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Resumo do Caixa */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Resumo Geral do Caixa</CardTitle>
-                    <CardDescription>Controle completo de entradas e saídas (todas as transações)</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
-                        <div>
-                          <span className="text-sm text-gray-600">Total Entradas</span>
-                          <p className="text-xl font-bold text-green-600">R$ {cashSummary.entradas.toFixed(2)}</p>
-                        </div>
-                        <TrendingUp className="w-8 h-8 text-green-600" />
-                      </div>
-
-                      <div className="flex justify-between items-center p-4 bg-red-50 rounded-lg">
-                        <div>
-                          <span className="text-sm text-gray-600">Total Saídas</span>
-                          <p className="text-xl font-bold text-red-600">R$ {cashSummary.saidas.toFixed(2)}</p>
-                        </div>
-                        <TrendingDown className="w-8 h-8 text-red-600" />
-                      </div>
-
-                      <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                        <div>
-                          <span className="text-sm text-gray-600">Saldo Total</span>
-                          <p
-                            className={`text-xl font-bold ${cashSummary.total >= 0 ? "text-blue-600" : "text-red-600"}`}
-                          >
-                            R$ {cashSummary.total.toFixed(2)}
-                          </p>
-                        </div>
-                        <DollarSign className="w-8 h-8 text-blue-600" />
-                      </div>
-                    </div>
-
-                    {/* Resumo por Forma de Pagamento */}
-                    <div className="mb-6">
-                      <h3 className="text-lg font-semibold mb-3">Por Forma de Pagamento</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {paymentMethods.map((method) => {
-                          const amount = cashSummary.byPaymentMethod[method.value] || 0
-                          const IconComponent = method.icon
-                          return (
-                            <div key={method.value} className="p-3 border rounded-lg">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <IconComponent className="w-4 h-4" />
-                                <span className="text-sm font-medium">{method.label}</span>
-                              </div>
-                              <p className={`text-lg font-bold ${amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                R$ {amount.toFixed(2)}
-                              </p>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Transações Recentes */}
+                  <h3 className="text-xl font-bold mt-6">Balanço de Caixa</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold mb-3">Transações Recentes</h3>
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {cashTransactions.slice(0, 10).map((transaction) => {
-                          const PaymentIcon =
-                            paymentMethods.find((m) => m.value === transaction.paymentMethod)?.icon || Banknote
-                          const TypeIcon =
-                            transactionTypes.find((t) => t.value === transaction.type)?.icon || TrendingUp
-                          const typeColor =
-                            transactionTypes.find((t) => t.value === transaction.type)?.color || "text-gray-600"
-
-                          return (
-                            <div
-                              key={transaction.id}
-                              className="flex justify-between items-center p-3 border rounded-lg"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <div
-                                  className={`p-2 rounded-full ${transaction.type === "entrada" ? "bg-green-100" : "bg-red-100"}`}
-                                >
-                                  <TypeIcon className={`w-4 h-4 ${typeColor}`} />
-                                </div>
-                                <div>
-                                  <p className="font-medium">{transaction.description}</p>
-                                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                                    <PaymentIcon className="w-3 h-3" />
-                                    <span>
-                                      {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label}
-                                    </span>
-                                    <span>•</span>
-                                    <span>{transaction.timestamp}</span>
-                                    {transaction.isAutomatic && (
-                                      <>
-                                        <span>•</span>
-                                        <Badge variant="outline" className="text-xs">
-                                          Automático
-                                        </Badge>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p
-                                  className={`font-bold ${transaction.type === "entrada" ? "text-green-600" : "text-red-600"}`}
-                                >
-                                  {transaction.type === "entrada" ? "+" : "-"}R$ {transaction.amount.toFixed(2)}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Lançar Nova Transação */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Nova Transação</CardTitle>
-                    <CardDescription>Lançar entrada ou saída manual</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label>Tipo de Transação</Label>
-                      <Select
-                        value={newTransaction.type}
-                        onValueChange={(value) => setNewTransaction((prev) => ({ ...prev, type: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {transactionTypes.map((type) => {
-                            const IconComponent = type.icon
-                            return (
-                              <SelectItem key={type.value} value={type.value}>
-                                <div className="flex items-center space-x-2">
-                                  <IconComponent className={`w-4 h-4 ${type.color}`} />
-                                  <span>{type.label}</span>
-                                </div>
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Forma de Pagamento</Label>
-                      <Select
-                        value={newTransaction.paymentMethod}
-                        onValueChange={(value) => setNewTransaction((prev) => ({ ...prev, paymentMethod: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {paymentMethods.map((method) => {
-                            const IconComponent = method.icon
-                            return (
-                              <SelectItem key={method.value} value={method.value}>
-                                <div className="flex items-center space-x-2">
-                                  <IconComponent className="w-4 h-4" />
-                                  <span>{method.label}</span>
-                                </div>
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Valor</Label>
+                      <Label htmlFor="cash-balance">Novo Saldo (R$)</Label>
                       <Input
                         type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={newTransaction.amount}
-                        onChange={(e) => setNewTransaction((prev) => ({ ...prev, amount: e.target.value }))}
+                        id="cash-balance"
+                        placeholder="Novo Saldo"
+                        value={cashBalance.newBalance}
+                        onChange={(e) => setCashBalance({ ...cashBalance, newBalance: e.target.value })}
                       />
                     </div>
-
-                    <div>
-                      <Label>Descrição</Label>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="cash-reason">Motivo</Label>
                       <Textarea
-                        placeholder="Descreva a transação..."
-                        value={newTransaction.description}
-                        onChange={(e) => setNewTransaction((prev) => ({ ...prev, description: e.target.value }))}
-                        rows={3}
+                        id="cash-reason"
+                        placeholder="Motivo do balanço"
+                        value={cashBalance.reason}
+                        onChange={(e) => setCashBalance({ ...cashBalance, reason: e.target.value })}
                       />
                     </div>
-
-                    <Button
-                      className="w-full"
-                      onClick={addManualTransaction}
-                      disabled={!newTransaction.amount || !newTransaction.description}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Lançar Transação
-                    </Button>
-
-                    <div className="pt-4 border-t">
-                      <p className="text-sm text-gray-600 mb-2">
-                        <strong>Nota:</strong> Pedidos do cardápio digital são automaticamente registrados como entradas
-                        no caixa.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Balanço de Caixa</CardTitle>
-                  <CardDescription>Ajustar saldo do caixa para um valor específico</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Saldo Atual do Caixa</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      R${" "}
-                      {cashTransactions
-                        .reduce((total, transaction) => {
-                          return transaction.type === "entrada"
-                            ? total + transaction.amount
-                            : total - transaction.amount
-                        }, 0)
-                        .toFixed(2)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label>Novo Saldo do Caixa</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={cashBalance.newBalance}
-                      onChange={(e) => setCashBalance((prev) => ({ ...prev, newBalance: e.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Motivo do Ajuste</Label>
-                    <Textarea
-                      placeholder="Ex: Contagem física, correção de erro, ajuste inicial..."
-                      value={cashBalance.reason}
-                      onChange={(e) => setCashBalance((prev) => ({ ...prev, reason: e.target.value }))}
-                      rows={3}
-                    />
                   </div>
 
                   <Button
-                    className="w-full"
                     onClick={() => {
                       if (cashBalance.newBalance && cashBalance.reason) {
-                        balanceCash(Number.parseFloat(cashBalance.newBalance), cashBalance.reason)
+                        balanceCash(Number(cashBalance.newBalance), cashBalance.reason)
                         setCashBalance({ newBalance: "", reason: "" })
                       }
                     }}
-                    disabled={!cashBalance.newBalance || !cashBalance.reason}
                   >
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Fazer Balanço do Caixa
+                    Ajustar Saldo
                   </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="stock">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Controle de Estoque</CardTitle>
-                  <CardDescription>Gerencie entrada e saída de produtos</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Produto</Label>
-                      <select className="w-full p-2 border rounded-md" id="stock-product">
-                        <option value="">Selecione um produto</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name} (Estoque: {product.stock})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Tipo de Movimentação</Label>
-                      <select className="w-full p-2 border rounded-md" id="stock-type">
-                        <option value="entrada">Entrada</option>
-                        <option value="saida">Saída</option>
-                        <option value="balanco">Balanço</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label>Quantidade</Label>
-                      <Input
-                        type="number"
-                        min="0.1"
-                        step={stockUnit === "kilo" ? "0.1" : "1"}
-                        placeholder="0"
-                        id="stock-quantity"
-                      />
-                    </div>
-                    <div>
-                      <Label>Unidade</Label>
-                      <select
-                        className="w-full p-2 border rounded-md"
-                        id="stock-unit"
-                        value={stockUnit}
-                        onChange={(e) => setStockUnit(e.target.value as "unidade" | "kilo")}
-                      >
-                        <option value="unidade">Unidade</option>
-                        <option value="kilo">Kilo (kg)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Motivo</Label>
-                      <Input placeholder="Ex: Compra, Perda, Ajuste" id="stock-reason" />
-                    </div>
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={() => {
-                      const productSelect = document.getElementById("stock-product") as HTMLSelectElement
-                      const typeSelect = document.getElementById("stock-type") as HTMLSelectElement
-                      const quantityInput = document.getElementById("stock-quantity") as HTMLInputElement
-                      const reasonInput = document.getElementById("stock-reason") as HTMLInputElement
-                      const unitSelect = document.getElementById("stock-unit") as HTMLSelectElement
-
-                      if (productSelect.value && quantityInput.value && reasonInput.value) {
-                        if (typeSelect.value === "balanco") {
-                          balanceStock(
-                            Number.parseInt(productSelect.value),
-                            Number.parseFloat(quantityInput.value),
-                            reasonInput.value,
-                          )
-                        } else {
-                          updateStock(
-                            Number.parseInt(productSelect.value),
-                            Number.parseFloat(quantityInput.value),
-                            typeSelect.value as "entrada" | "saida",
-                            reasonInput.value,
-                            unitSelect.value as "unidade" | "kilo",
-                          )
-                        }
-                        quantityInput.value = ""
-                        reasonInput.value = ""
-                        productSelect.value = ""
-                      }
-                    }}
-                  >
-                    <Package className="w-4 h-4 mr-2" />
-                    Registrar Movimentação
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Status do Estoque</CardTitle>
-                  <CardDescription>Visualize o estoque atual de todos os produtos</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {products.map((product) => (
-                      <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.name}
-                            className="w-12 h-12 object-cover rounded-lg"
-                          />
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-gray-600">{product.category}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p
-                            className={`font-bold text-lg ${product.stock <= stockAlert ? "text-red-600" : "text-green-600"}`}
-                          >
-                            {product.stock}{" "}
-                            {product.category === "Carnes" || product.category === "Ingredientes" ? "kg" : "un"}
-                          </p>
-                          {product.stock <= stockAlert && (
-                            <Badge variant="destructive" className="text-xs">
-                              Estoque Baixo
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="mt-8">
-              <CardHeader>
-                <CardTitle>Histórico de Movimentações</CardTitle>
-                <CardDescription>Últimas movimentações de estoque</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {stockMovements.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">Nenhuma movimentação registrada</p>
-                  ) : (
-                    stockMovements.map((movement) => (
-                      <div key={movement.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{movement.productName}</p>
-                          <p className="text-sm text-gray-600">{movement.reason}</p>
-                          <p className="text-xs text-gray-500">
-                            {movement.date} - {movement.user}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={movement.type === "entrada" ? "default" : "secondary"}>
-                            {movement.type === "entrada" ? "+" : "-"}
-                            {movement.quantity} {movement.unit === "kilo" ? "kg" : "un"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* Configurações */}
           <TabsContent value="settings">
             <Card>
               <CardHeader>
-                <CardTitle>Configurações do Sistema</CardTitle>
-                <CardDescription>Gerencie as configurações administrativas</CardDescription>
+                <CardTitle>Configurações Gerais</CardTitle>
+                <CardDescription>Ajuste as configurações do sistema</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-8">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4 flex items-center">
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      Configuração do WhatsApp
-                    </h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="whatsapp-phone">Número do WhatsApp da Empresa</Label>
-                          <Input
-                            id="whatsapp-phone"
-                            type="text"
-                            placeholder="5511999999999 (apenas números)"
-                            value={whatsappConfig.phone}
-                            onChange={(e) => setWhatsappConfig((prev) => ({ ...prev, phone: e.target.value }))}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Digite apenas números (ex: 5511999999999)</p>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="whatsapp-message">Mensagem Padrão</Label>
-                          <Textarea
-                            id="whatsapp-message"
-                            placeholder="Mensagem que aparecerá no WhatsApp"
-                            value={whatsappConfig.message}
-                            onChange={(e) => setWhatsappConfig((prev) => ({ ...prev, message: e.target.value }))}
-                            rows={3}
-                          />
-                        </div>
-
-                        <Button onClick={handleSaveWhatsappConfig} className="w-full">
-                          <Save className="w-4 h-4 mr-2" />
-                          Salvar Configuração WhatsApp
-                        </Button>
-                      </div>
-
-                      <div className="p-4 bg-green-50 rounded-lg">
-                        <h4 className="font-medium text-green-900 mb-2">Como funciona:</h4>
-                        <ul className="text-sm text-green-700 space-y-1">
-                          <li>• Cliente finaliza pedido no cardápio</li>
-                          <li>• Pedido é enviado automaticamente para o WhatsApp</li>
-                          <li>• Mensagem inclui todos os detalhes do pedido</li>
-                          <li>• Cliente pode conversar diretamente com você</li>
-                        </ul>
-                      </div>
-                    </div>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Configurações do WhatsApp</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp-phone">Número do WhatsApp</Label>
+                    <Input
+                      type="tel"
+                      id="whatsapp-phone"
+                      placeholder="Número com DDD (ex: 11999999999)"
+                      value={whatsappConfig.phone}
+                      onChange={(e) => setWhatsappConfig({ ...whatsappConfig, phone: e.target.value })}
+                    />
                   </div>
-
-                  <div className="border-t pt-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center">
-                      <Key className="w-5 h-5 mr-2" />
-                      Alterar Credenciais de Acesso
-                    </h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Credenciais Atuais</Label>
-                          <div className="p-4 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <User className="w-4 h-4 text-gray-600" />
-                              <span className="text-sm text-gray-600">Usuário:</span>
-                              <span className="font-medium">{credentials.username}</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Lock className="w-4 h-4 text-gray-600" />
-                              <span className="text-sm text-gray-600">Senha:</span>
-                              <span className="font-medium">{"*".repeat(credentials.password.length)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="new-username">Novo Usuário</Label>
-                          <Input
-                            id="new-username"
-                            type="text"
-                            placeholder="Digite o novo usuário"
-                            value={newCredentials.username}
-                            onChange={(e) => setNewCredentials((prev) => ({ ...prev, username: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="new-password">Nova Senha</Label>
-                          <Input
-                            id="new-password"
-                            type="password"
-                            placeholder="Digite a nova senha"
-                            value={newCredentials.password}
-                            onChange={(e) => setNewCredentials((prev) => ({ ...prev, password: e.target.value }))}
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
-                          <Input
-                            id="confirm-password"
-                            type="password"
-                            placeholder="Confirme a nova senha"
-                            value={newCredentials.confirmPassword}
-                            onChange={(e) =>
-                              setNewCredentials((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                            }
-                          />
-                        </div>
-
-                        {credentialsError && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-sm text-red-600">{credentialsError}</p>
-                          </div>
-                        )}
-
-                        <Button
-                          onClick={handleChangeCredentials}
-                          disabled={
-                            !newCredentials.username || !newCredentials.password || !newCredentials.confirmPassword
-                          }
-                          className="w-full"
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Salvar Novas Credenciais
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp-message">Mensagem Padrão</Label>
+                    <Textarea
+                      id="whatsapp-message"
+                      placeholder="Mensagem que será enviada ao cliente"
+                      value={whatsappConfig.message}
+                      onChange={(e) => setWhatsappConfig({ ...whatsappConfig, message: e.target.value })}
+                    />
                   </div>
+                  <Button onClick={handleSaveWhatsappConfig}>Salvar Configurações do WhatsApp</Button>
+                </div>
 
-                  <div className="border-t pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Informações do Sistema</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-900">Versão</h4>
-                        <p className="text-blue-700">v1.0.0</p>
-                      </div>
-                      <div className="p-4 bg-green-50 rounded-lg">
-                        <h4 className="font-medium text-green-900">Status</h4>
-                        <p className="text-green-700">Online</p>
-                      </div>
-                      <div className="p-4 bg-purple-50 rounded-lg">
-                        <h4 className="font-medium text-purple-900">Último Acesso</h4>
-                        <p className="text-purple-700">15/01/2024 14:50</p>
-                      </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Alterar Credenciais</h3>
+                  <Button variant="outline" onClick={() => setShowChangeCredentials(!showChangeCredentials)}>
+                    {showChangeCredentials ? "Cancelar" : "Alterar Credenciais"}
+                  </Button>
+
+                  {showChangeCredentials && (
+                    <div className="space-y-2 mt-4">
+                      <Label htmlFor="new-username">Novo Usuário</Label>
+                      <Input
+                        type="text"
+                        id="new-username"
+                        placeholder="Novo usuário"
+                        value={newCredentials.username}
+                        onChange={(e) => setNewCredentials({ ...newCredentials, username: e.target.value })}
+                      />
+
+                      <Label htmlFor="new-password">Nova Senha</Label>
+                      <Input
+                        type="password"
+                        id="new-password"
+                        placeholder="Nova senha"
+                        value={newCredentials.password}
+                        onChange={(e) => setNewCredentials({ ...newCredentials, password: e.target.value })}
+                      />
+
+                      <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                      <Input
+                        type="password"
+                        id="confirm-password"
+                        placeholder="Confirmar senha"
+                        value={newCredentials.confirmPassword}
+                        onChange={(e) => setNewCredentials({ ...newCredentials, confirmPassword: e.target.value })}
+                      />
+
+                      {credentialsError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-600">{credentialsError}</p>
+                        </div>
+                      )}
+
+                      <Button onClick={handleChangeCredentials}>Salvar Nova Senha</Button>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

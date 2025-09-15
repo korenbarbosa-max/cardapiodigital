@@ -34,6 +34,10 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 25,
     visibleInMenu: true,
+    extras: [
+      { name: "Queijo", price: 2.9 },
+      { name: "Tomate Seco", price: 1.9 },
+    ],
   },
   {
     id: 2,
@@ -45,6 +49,7 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 15,
     visibleInMenu: true,
+    extras: [],
   },
   {
     id: 3,
@@ -56,6 +61,10 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 20,
     visibleInMenu: true,
+    extras: [
+      { name: "Cebola", price: 3.9 },
+      { name: "Alho", price: 2.9 },
+    ],
   },
   {
     id: 4,
@@ -67,6 +76,7 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 12,
     visibleInMenu: true,
+    extras: [],
   },
   {
     id: 5,
@@ -78,6 +88,10 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 18,
     visibleInMenu: true,
+    extras: [
+      { name: "Arroz Integral", price: 4.9 },
+      { name: "Batata Doce", price: 3.9 },
+    ],
   },
   {
     id: 6,
@@ -89,6 +103,7 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 30,
     visibleInMenu: true,
+    extras: [],
   },
   {
     id: 7,
@@ -100,6 +115,7 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 50,
     visibleInMenu: true,
+    extras: [],
   },
   {
     id: 8,
@@ -111,11 +127,16 @@ const initialMenuProducts = [
     status: "ativo",
     stock: 10,
     visibleInMenu: true,
+    extras: [],
   },
 ]
 
 export default function DigitalMenu() {
-  const [cart, setCart] = useState<{ [key: number]: number }>({})
+  const [cart, setCart] = useState<{ [key: string]: { quantity: number; extras: { name: string; price: number }[] } }>(
+    {},
+  )
+  const [selectedExtras, setSelectedExtras] = useState<{ [key: number]: { name: string; price: number }[] }>({})
+  const [showExtrasModal, setShowExtrasModal] = useState<number | null>(null)
   const [activeCategory, setActiveCategory] = useState("Entradas")
   const [showCheckout, setShowCheckout] = useState(false)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
@@ -134,11 +155,34 @@ export default function DigitalMenu() {
     if (typeof window !== "undefined") {
       const savedProducts = localStorage.getItem("products")
       if (savedProducts) {
-        setProducts(JSON.parse(savedProducts))
+        const parsedProducts = JSON.parse(savedProducts)
+        setProducts(parsedProducts)
       } else {
+        // Se não há produtos salvos, usar produtos iniciais e salvar no localStorage
         setProducts(initialMenuProducts)
         localStorage.setItem("products", JSON.stringify(initialMenuProducts))
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (typeof window !== "undefined") {
+        const savedProducts = localStorage.getItem("products")
+        if (savedProducts) {
+          setProducts(JSON.parse(savedProducts))
+        }
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+
+    // Também verificar mudanças a cada 1 segundo para mudanças na mesma aba
+    const interval = setInterval(handleStorageChange, 1000)
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      clearInterval(interval)
     }
   }, [])
 
@@ -150,34 +194,65 @@ export default function DigitalMenu() {
     return visibleProducts.filter((product) => product.category === category)
   }
 
-  const addToCart = (itemId: number) => {
+  const addToCartWithExtras = (itemId: number, extras: { name: string; price: number }[] = []) => {
+    console.log("[v0] Adicionando produto ao carrinho:", itemId, "com acréscimos:", extras)
+    const cartKey = `${itemId}-${JSON.stringify(extras.sort((a, b) => a.name.localeCompare(b.name)))}`
     setCart((prev) => ({
       ...prev,
-      [itemId]: (prev[itemId] || 0) + 1,
+      [cartKey]: {
+        quantity: (prev[cartKey]?.quantity || 0) + 1,
+        extras: extras,
+      },
     }))
+    setShowExtrasModal(null)
+    setSelectedExtras((prev) => ({ ...prev, [itemId]: [] }))
   }
 
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (cartKey: string) => {
     setCart((prev) => {
       const newCart = { ...prev }
-      if (newCart[itemId] > 1) {
-        newCart[itemId]--
+      if (newCart[cartKey].quantity > 1) {
+        newCart[cartKey].quantity--
       } else {
-        delete newCart[itemId]
+        delete newCart[cartKey]
       }
       return newCart
     })
   }
 
   const getCartTotal = () => {
-    return Object.entries(cart).reduce((total, [itemId, quantity]) => {
-      const item = visibleProducts.find((item) => item.id === Number.parseInt(itemId))
-      return total + (item?.price || 0) * quantity
+    return Object.entries(cart).reduce((total, [cartKey, cartItem]) => {
+      const itemId = Number.parseInt(cartKey.split("-")[0])
+      const item = visibleProducts.find((item) => item.id === itemId)
+      if (!item) return total
+
+      const itemPrice = item.price
+      const extrasPrice = cartItem.extras.reduce((sum, extra) => sum + extra.price, 0)
+      return total + (itemPrice + extrasPrice) * cartItem.quantity
     }, 0)
   }
 
   const getCartItemCount = () => {
-    return Object.values(cart).reduce((total, quantity) => total + quantity, 0)
+    return Object.values(cart).reduce((total, cartItem) => total + cartItem.quantity, 0)
+  }
+
+  const toggleExtra = (itemId: number, extra: { name: string; price: number }) => {
+    setSelectedExtras((prev) => {
+      const current = prev[itemId] || []
+      const exists = current.find((e) => e.name === extra.name)
+
+      if (exists) {
+        return {
+          ...prev,
+          [itemId]: current.filter((e) => e.name !== extra.name),
+        }
+      } else {
+        return {
+          ...prev,
+          [itemId]: [...current, extra],
+        }
+      }
+    })
   }
 
   const handleFinishOrder = () => {
@@ -185,13 +260,15 @@ export default function DigitalMenu() {
 
     const order = {
       id: Date.now(),
-      items: Object.entries(cart).map(([itemId, quantity]) => {
-        const item = visibleProducts.find((item) => item.id === Number.parseInt(itemId))
+      items: Object.entries(cart).map(([cartKey, cartItem]) => {
+        const itemId = Number.parseInt(cartKey.split("-")[0])
+        const item = visibleProducts.find((item) => item.id === itemId)
         return {
-          id: Number.parseInt(itemId),
+          id: itemId,
           name: item?.name,
           price: item?.price,
-          quantity,
+          quantity: cartItem.quantity,
+          extras: cartItem.extras,
         }
       }),
       customer: customerData,
@@ -225,7 +302,11 @@ export default function DigitalMenu() {
       message += `*ITENS:*\n`
 
       lastOrder.items.forEach((item: any) => {
-        message += `• ${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}\n`
+        message += `• ${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}`
+        if (item.extras && item.extras.length > 0) {
+          message += ` (+ ${item.extras.map((extra: any) => `${extra.name}`).join(", ")})`
+        }
+        message += `\n`
       })
 
       message += `\n*TOTAL: R$ ${lastOrder.total.toFixed(2)}*\n`
@@ -369,24 +450,42 @@ export default function DigitalMenu() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => removeFromCart(item.id)}
-                                disabled={!cart[item.id]}
+                                onClick={() => removeFromCart(`${item.id}-${JSON.stringify([])}`)}
+                                disabled={!cart[`${item.id}-${JSON.stringify([])}`]}
                                 className="h-8 w-8 p-0"
                               >
                                 <Minus className="w-4 h-4" />
                               </Button>
-                              <span className="w-8 text-center font-medium">{cart[item.id] || 0}</span>
+                              <span className="w-8 text-center font-medium">
+                                {cart[`${item.id}-${JSON.stringify([])}`]?.quantity || 0}
+                              </span>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => addToCart(item.id)}
+                                onClick={() => {
+                                  if (item.extras && item.extras.length > 0) {
+                                    setShowExtrasModal(item.id)
+                                  } else {
+                                    addToCartWithExtras(item.id, [])
+                                  }
+                                }}
                                 className="h-8 w-8 p-0"
                               >
                                 <Plus className="w-4 h-4" />
                               </Button>
                             </div>
                             <button
-                              onClick={() => addToCart(item.id)}
+                              onClick={() => {
+                                console.log("[v0] Produto clicado:", item.name, "ID:", item.id)
+                                console.log("[v0] Acréscimos do produto:", item.extras)
+                                console.log("[v0] Tem acréscimos?", item.extras && item.extras.length > 0)
+
+                                if (item.extras && item.extras.length > 0) {
+                                  setShowExtrasModal(item.id)
+                                } else {
+                                  addToCartWithExtras(item.id, [])
+                                }
+                              }}
                               className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all h-9 px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 focus:bg-orange-700 active:bg-orange-800"
                               style={{
                                 backgroundColor: "#ea580c !important",
@@ -419,19 +518,36 @@ export default function DigitalMenu() {
                   <p className="text-gray-500 text-center py-4">Carrinho vazio</p>
                 ) : (
                   <div className="space-y-4">
-                    {Object.entries(cart).map(([itemId, quantity]) => {
-                      const item = visibleProducts.find((item) => item.id === Number.parseInt(itemId))
+                    {Object.entries(cart).map(([cartKey, cartItem]) => {
+                      const itemId = Number.parseInt(cartKey.split("-")[0])
+                      const item = visibleProducts.find((item) => item.id === itemId)
                       if (!item) return null
 
+                      const extrasPrice = cartItem.extras.reduce((sum, extra) => sum + extra.price, 0)
+                      const totalItemPrice = (item.price + extrasPrice) * cartItem.quantity
+
                       return (
-                        <div key={itemId} className="flex justify-between items-center">
-                          <div>
+                        <div key={cartKey} className="flex justify-between items-start">
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{item.name}</p>
+                            {cartItem.extras.length > 0 && (
+                              <p className="text-xs text-blue-600">+ {cartItem.extras.map((e) => e.name).join(", ")}</p>
+                            )}
                             <p className="text-xs text-gray-500">
-                              {quantity}x R$ {item.price.toFixed(2)}
+                              {cartItem.quantity}x R$ {(item.price + extrasPrice).toFixed(2)}
                             </p>
                           </div>
-                          <p className="font-bold">R$ {(item.price * quantity).toFixed(2)}</p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFromCart(cartKey)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <p className="font-bold text-sm">R$ {totalItemPrice.toFixed(2)}</p>
+                          </div>
                         </div>
                       )
                     })}
@@ -477,7 +593,14 @@ export default function DigitalMenu() {
                     <span>
                       {item.quantity}x {item.name}
                     </span>
-                    <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
+                    {item.extras.length > 0 && <span>+ {item.extras.map((extra: any) => extra.name).join(", ")}</span>}
+                    <span>
+                      R${" "}
+                      {(
+                        item.price +
+                        item.extras.reduce((sum: number, extra: any) => sum + extra.price, 0) * item.quantity
+                      ).toFixed(2)}
+                    </span>
                   </div>
                 ))}
                 <div className="flex justify-between font-bold text-sm border-t pt-2">
@@ -624,15 +747,25 @@ export default function DigitalMenu() {
 
               <div className="border-t pt-4 space-y-2">
                 <h4 className="font-medium">Resumo do Pedido:</h4>
-                {Object.entries(cart).map(([itemId, quantity]) => {
-                  const item = visibleProducts.find((item) => item.id === Number.parseInt(itemId))
+                {Object.entries(cart).map(([cartKey, cartItem]) => {
+                  const itemId = Number.parseInt(cartKey.split("-")[0])
+                  const item = visibleProducts.find((item) => item.id === itemId)
                   if (!item) return null
                   return (
-                    <div key={itemId} className="flex justify-between text-sm">
+                    <div key={cartKey} className="flex justify-between text-sm">
                       <span>
-                        {quantity}x {item.name}
+                        {cartItem.quantity}x {item.name}
                       </span>
-                      <span>R$ {(item.price * quantity).toFixed(2)}</span>
+                      {cartItem.extras.length > 0 && (
+                        <span>+ {cartItem.extras.map((extra: any) => extra.name).join(", ")}</span>
+                      )}
+                      <span>
+                        R${" "}
+                        {(
+                          item.price +
+                          cartItem.extras.reduce((sum: number, extra: any) => sum + extra.price, 0) * cartItem.quantity
+                        ).toFixed(2)}
+                      </span>
                     </div>
                   )
                 })}
@@ -660,6 +793,83 @@ export default function DigitalMenu() {
           </Card>
         </div>
       )}
+
+      {showExtrasModal &&
+        (() => {
+          const item = visibleProducts.find((p) => p.id === showExtrasModal)
+          console.log("[v0] Modal de acréscimos aberto para produto:", item?.name)
+          console.log("[v0] Acréscimos disponíveis:", item?.extras)
+
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Personalizar Produto</CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setShowExtrasModal(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(() => {
+                    if (!item) return null
+
+                    return (
+                      <>
+                        <div>
+                          <h3 className="font-medium">{item.name}</h3>
+                          <p className="text-sm text-gray-600">{item.description}</p>
+                          <p className="text-lg font-bold text-orange-600">R$ {item.price.toFixed(2)}</p>
+                        </div>
+
+                        {item.extras && item.extras.length > 0 && (
+                          <div>
+                            <h4 className="font-medium mb-2">Acréscimos disponíveis:</h4>
+                            <div className="space-y-2">
+                              {item.extras.map((extra, index) => (
+                                <label key={index} className="flex items-center space-x-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={(selectedExtras[item.id] || []).some((e) => e.name === extra.name)}
+                                    onChange={() => toggleExtra(item.id, extra)}
+                                    className="rounded"
+                                  />
+                                  <span className="flex-1">{extra.name}</span>
+                                  <span className="font-medium">+ R$ {extra.price.toFixed(2)}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="border-t pt-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="font-medium">Total:</span>
+                            <span className="text-lg font-bold">
+                              R${" "}
+                              {(
+                                item.price +
+                                (selectedExtras[item.id] || []).reduce((sum, extra) => sum + extra.price, 0)
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <Button
+                            className="w-full bg-orange-600 hover:bg-orange-700"
+                            onClick={() => addToCartWithExtras(item.id, selectedExtras[item.id] || [])}
+                          >
+                            Adicionar ao Carrinho
+                          </Button>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          )
+        })()}
     </div>
   )
 }
