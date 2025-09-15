@@ -195,7 +195,6 @@ export default function DigitalMenu() {
   }
 
   const addToCartWithExtras = (itemId: number, extras: { name: string; price: number }[] = []) => {
-    console.log("[v0] Adicionando produto ao carrinho:", itemId, "com acréscimos:", extras)
     const cartKey = `${itemId}-${JSON.stringify(extras.sort((a, b) => a.name.localeCompare(b.name)))}`
     setCart((prev) => ({
       ...prev,
@@ -476,10 +475,6 @@ export default function DigitalMenu() {
                             </div>
                             <button
                               onClick={() => {
-                                console.log("[v0] Produto clicado:", item.name, "ID:", item.id)
-                                console.log("[v0] Acréscimos do produto:", item.extras)
-                                console.log("[v0] Tem acréscimos?", item.extras && item.extras.length > 0)
-
                                 if (item.extras && item.extras.length > 0) {
                                   setShowExtrasModal(item.id)
                                 } else {
@@ -797,8 +792,6 @@ export default function DigitalMenu() {
       {showExtrasModal &&
         (() => {
           const item = visibleProducts.find((p) => p.id === showExtrasModal)
-          console.log("[v0] Modal de acréscimos aberto para produto:", item?.name)
-          console.log("[v0] Acréscimos disponíveis:", item?.extras)
 
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
