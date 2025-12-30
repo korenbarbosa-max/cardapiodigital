@@ -248,14 +248,26 @@ export default function DigitalMenu() {
     if (whatsappConfig.phone && lastOrder) {
       let message = `${whatsappConfig.message}\n\n`
       message += `*PEDIDO #${lastOrder.id}*\n\n`
-      message += `*Cliente:* ${lastOrder.customer_name}\n`
-      message += `*Telefone:* ${lastOrder.customer_phone}\n`
-      message += `*Endereço:* ${lastOrder.customer.address}\n`
-      message += `*Pagamento:* ${lastOrder.customer.paymentMethod}\n\n`
-      message += `*ITENS:*\n`
+      message += `*Cliente:* ${lastOrder.customer_name || customerData.name}\n`
+      message += `*Telefone:* ${lastOrder.customer_phone || customerData.phone}\n`
+
+      if (customerData.address) {
+        message += `*Endereço:* ${customerData.address}\n`
+      }
+      if (customerData.paymentMethod) {
+        message += `*Pagamento:* ${customerData.paymentMethod}\n`
+      }
+
+      message += `\n*ITENS:*\n`
 
       lastOrder.items.forEach((item: any) => {
-        message += `• ${item.quantity}x ${item.name} - R$ ${(item.price * item.quantity).toFixed(2)}`
+        const itemTotal = item.price * item.quantity
+        const extrasTotal =
+          item.extras && item.extras.length > 0
+            ? item.extras.reduce((sum: number, extra: any) => sum + (extra.price || 0), 0) * item.quantity
+            : 0
+
+        message += `• ${item.quantity}x ${item.name} - R$ ${(itemTotal + extrasTotal).toFixed(2)}`
         if (item.extras && item.extras.length > 0) {
           message += ` (+ ${item.extras.map((extra: any) => `${extra.name}`).join(", ")})`
         }
@@ -264,8 +276,8 @@ export default function DigitalMenu() {
 
       message += `\n*TOTAL: R$ ${lastOrder.total.toFixed(2)}*\n`
 
-      if (lastOrder.customer.observations) {
-        message += `\n*Observações:* ${lastOrder.customer.observations}`
+      if (customerData.observations) {
+        message += `\n*Observações:* ${customerData.observations}`
       }
 
       const encodedMessage = encodeURIComponent(message)
@@ -558,7 +570,7 @@ export default function DigitalMenu() {
                       R${" "}
                       {(
                         item.price +
-                        item.extras.reduce((sum: number, extra: any) => sum + extra.price, 0) * item.quantity
+                        item.extras.reduce((sum: number, extra: any) => sum + (extra.price || 0), 0) * item.quantity
                       ).toFixed(2)}
                     </span>
                   </div>
@@ -723,7 +735,8 @@ export default function DigitalMenu() {
                         R${" "}
                         {(
                           item.price +
-                          cartItem.extras.reduce((sum: number, extra: any) => sum + extra.price, 0) * cartItem.quantity
+                          cartItem.extras.reduce((sum: number, extra: any) => sum + (extra.price || 0), 0) *
+                            cartItem.quantity
                         ).toFixed(2)}
                       </span>
                     </div>
@@ -808,7 +821,7 @@ export default function DigitalMenu() {
                               R${" "}
                               {(
                                 item.price +
-                                (selectedExtras[item.id] || []).reduce((sum, extra) => sum + extra.price, 0)
+                                (selectedExtras[item.id] || []).reduce((sum, extra) => sum + (extra.price || 0), 0)
                               ).toFixed(2)}
                             </span>
                           </div>

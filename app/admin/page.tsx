@@ -310,6 +310,32 @@ const AdminPanel = () => {
           const categoriesData = await categoriesResponse.json()
           setCategories(categoriesData)
         }
+
+        // Load orders from API
+        const ordersResponse = await fetch("/api/orders")
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json()
+
+          // Convert API orders to admin format
+          const convertedOrders = ordersData.map((order: any) => {
+            const orderDate = order.created_at ? new Date(order.created_at) : new Date()
+
+            return {
+              id: order.id,
+              mesa: order.customer_name ? `Cliente: ${order.customer_name}` : "Pedido sem nome",
+              items: order.items,
+              total: order.total,
+              status: order.status,
+              timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              customer: {
+                name: order.customer_name || "",
+                phone: order.customer_phone || "",
+              },
+            }
+          })
+
+          setOrders(convertedOrders)
+        }
       } catch (error) {
         console.error("Erro ao carregar dados:", error)
       } finally {
@@ -322,72 +348,45 @@ const AdminPanel = () => {
     }
   }, [isAuthenticated])
 
+  // Load orders from API with polling
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!isAuthenticated) return
 
-    const loadOrdersFromStorage = () => {
-      const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-      if (storedOrders.length > 0) {
-        // Converter pedidos do localStorage para o formato do formato do admin
-        const convertedOrders = storedOrders.map((order: any) => {
-          const orderDate = order.timestamp ? new Date(order.timestamp) : new Date()
-          const isValidDate = !isNaN(orderDate.getTime())
-          const finalDate = isValidDate ? orderDate : new Date()
+    const loadOrders = async () => {
+      try {
+        const ordersResponse = await fetch("/api/orders")
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json()
 
-          return {
-            id: order.id,
-            mesa: `Cliente: ${order.customer.name}`,
-            items: order.items,
-            total: order.total,
-            status: order.status,
-            timestamp: finalDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-            customer: order.customer,
-          }
-        })
+          // Convert API orders to admin format
+          const convertedOrders = ordersData.map((order: any) => {
+            const orderDate = order.created_at ? new Date(order.created_at) : new Date()
 
-        // Adicionar novos pedidos aos existentes
-        setOrders((prevOrders) => {
-          const existingIds = prevOrders.map((o) => o.id)
-          const newOrders = convertedOrders.filter((order: any) => !existingIds.includes(order.id))
-          return [...prevOrders, ...newOrders]
-        })
+            return {
+              id: order.id,
+              mesa: order.customer_name ? `Cliente: ${order.customer_name}` : "Pedido sem nome",
+              items: order.items,
+              total: order.total,
+              status: order.status,
+              timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              customer: {
+                name: order.customer_name || "",
+                phone: order.customer_phone || "",
+              },
+            }
+          })
 
-        // Adicionar transações de caixa para os novos pedidos
-        const newTransactions = convertedOrders.map((order: any) => {
-          const orderDate = order.timestamp ? new Date(order.timestamp) : new Date()
-          const isValidDate = !isNaN(orderDate.getTime())
-          const finalDate = isValidDate ? orderDate : new Date()
-
-          return {
-            id: `order-${order.id}`,
-            type: "entrada" as const,
-            amount: order.total,
-            paymentMethod: order.customer.paymentMethod.replace("-", "_"),
-            description: `Pedido #${order.id} - ${order.customer.name}`,
-            timestamp: finalDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-            date: finalDate.toISOString().split("T")[0],
-            isAutomatic: true,
-          }
-        })
-
-        setCashTransactions((prevTransactions) => {
-          const existingOrderIds = prevTransactions.filter((t) => t.id.startsWith("order-")).map((t) => t.id)
-          const newCashTransactions = newTransactions.filter((t) => !existingOrderIds.includes(t.id))
-          return [...newCashTransactions, ...prevTransactions]
-        })
-
-        // Limpar pedidos do localStorage após processar
-        localStorage.removeItem("orders")
+          setOrders(convertedOrders)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar pedidos:", error)
       }
     }
 
-    // Carregar pedidos na inicialização
-    loadOrdersFromStorage()
-
-    // Verificar novos pedidos a cada 5 segundos
-    const interval = setInterval(loadOrdersFromStorage, 5000)
+    // Check for new orders every 5 seconds
+    const interval = setInterval(loadOrders, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
