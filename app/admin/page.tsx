@@ -257,9 +257,10 @@ const AdminPanel = () => {
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
 
-  const [stockBalance, setStockBalance] = useState({
+  const [stockMovementType, setStockMovementType] = useState<"entrada" | "saida" | "ajuste">("entrada")
+  const [stockMovement, setStockMovement] = useState({
     productId: "",
-    newStock: "",
+    quantity: "",
     reason: "",
   })
 
@@ -268,8 +269,97 @@ const AdminPanel = () => {
     reason: "",
   })
 
+  const [stockBalance, setStockBalance] = useState({
+    productId: "",
+    newStock: "",
+    reason: "",
+  })
+
   const [loading, setLoading] = useState(true)
 
+  const loadProducts = async () => {
+    try {
+      const productsResponse = await fetch("/api/products")
+      if (productsResponse.ok) {
+        const productsData = await productsResponse.json()
+        setProducts(productsData)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const categoriesResponse = await fetch("/api/categories")
+      if (categoriesResponse.ok) {
+        const categoriesData = await categoriesResponse.json()
+        setCategories(categoriesData)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error)
+    }
+  }
+
+  const loadOrders = async () => {
+    try {
+      const ordersResponse = await fetch("/api/orders")
+      if (ordersResponse.ok) {
+        const ordersData = await ordersResponse.json()
+
+        // Convert API orders to admin format
+        const convertedOrders = ordersData.map((order: any) => {
+          const orderDate = order.created_at ? new Date(order.created_at) : new Date()
+
+          return {
+            id: order.id,
+            mesa: order.customer_name ? `Cliente: ${order.customer_name}` : "Pedido sem nome",
+            items: order.items,
+            total: order.total,
+            status: order.status,
+            timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            customer: {
+              name: order.customer_name || "",
+              phone: order.customer_phone || "",
+            },
+          }
+        })
+
+        setOrders(convertedOrders)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar pedidos:", error)
+    }
+  }
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setLoading(true)
+        await loadProducts()
+        await loadCategories()
+        await loadOrders()
+
+        const savedCredentials = localStorage.getItem("admin_credentials")
+        if (savedCredentials) {
+          setCredentials(JSON.parse(savedCredentials))
+        }
+
+        const isAuthenticatedFromStorage = localStorage.getItem("admin_authenticated")
+        if (isAuthenticatedFromStorage === "true") {
+          setIsAuthenticated(true)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados iniciais:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadInitialData()
+  }, [])
+
+  // Load cash transactions from API
   useEffect(() => {
     const loadCashTransactions = async () => {
       try {
@@ -279,7 +369,8 @@ const AdminPanel = () => {
           setCashTransactions(
             transactions.map((t: any) => ({
               ...t,
-              paymentMethod: "dinheiro",
+              amount: Number.parseFloat(t.amount) || 0,
+              paymentMethod: t.paymentMethod || "dinheiro",
               timestamp: new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
               date: new Date(t.created_at).toISOString().split("T")[0],
               isAutomatic: false,
@@ -291,84 +382,8 @@ const AdminPanel = () => {
       }
     }
 
-    loadCashTransactions()
-  }, [])
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedAuth = localStorage.getItem("admin_authenticated")
-      const savedCredentials = localStorage.getItem("admin_credentials")
-      const savedUsername = localStorage.getItem("admin_username")
-      const savedPassword = localStorage.getItem("admin_password")
-
-      if (savedAuth === "true") {
-        setIsAuthenticated(true)
-      }
-
-      if (savedCredentials) {
-        setCredentials(JSON.parse(savedCredentials))
-      } else if (savedUsername || savedPassword) {
-        setCredentials({
-          username: savedUsername || "admin",
-          password: savedPassword || "123456",
-        })
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-
-        // Load products
-        const productsResponse = await fetch("/api/products")
-        if (productsResponse.ok) {
-          const productsData = await productsResponse.json()
-          setProducts(productsData)
-        }
-
-        // Load categories
-        const categoriesResponse = await fetch("/api/categories")
-        if (categoriesResponse.ok) {
-          const categoriesData = await categoriesResponse.json()
-          setCategories(categoriesData)
-        }
-
-        // Load orders from API
-        const ordersResponse = await fetch("/api/orders")
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json()
-
-          // Convert API orders to admin format
-          const convertedOrders = ordersData.map((order: any) => {
-            const orderDate = order.created_at ? new Date(order.created_at) : new Date()
-
-            return {
-              id: order.id,
-              mesa: order.customer_name ? `Cliente: ${order.customer_name}` : "Pedido sem nome",
-              items: order.items,
-              total: order.total,
-              status: order.status,
-              timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-              customer: {
-                name: order.customer_name || "",
-                phone: order.customer_phone || "",
-              },
-            }
-          })
-
-          setOrders(convertedOrders)
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (isAuthenticated) {
-      loadData()
+      loadCashTransactions()
     }
   }, [isAuthenticated])
 
@@ -376,38 +391,6 @@ const AdminPanel = () => {
   useEffect(() => {
     if (!isAuthenticated) return
 
-    const loadOrders = async () => {
-      try {
-        const ordersResponse = await fetch("/api/orders")
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json()
-
-          // Convert API orders to admin format
-          const convertedOrders = ordersData.map((order: any) => {
-            const orderDate = order.created_at ? new Date(order.created_at) : new Date()
-
-            return {
-              id: order.id,
-              mesa: order.customer_name ? `Cliente: ${order.customer_name}` : "Pedido sem nome",
-              items: order.items,
-              total: order.total,
-              status: order.status,
-              timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-              customer: {
-                name: order.customer_name || "",
-                phone: order.customer_phone || "",
-              },
-            }
-          })
-
-          setOrders(convertedOrders)
-        }
-      } catch (error) {
-        console.error("Erro ao carregar pedidos:", error)
-      }
-    }
-
-    // Check for new orders every 5 seconds
     const interval = setInterval(loadOrders, 5000)
     return () => clearInterval(interval)
   }, [isAuthenticated])
@@ -699,6 +682,64 @@ const AdminPanel = () => {
     }
   }
 
+  const addStockMovement = async () => {
+    if (!stockMovement.productId || !stockMovement.quantity || !stockMovement.reason) {
+      alert("Preencha todos os campos")
+      return
+    }
+
+    const product = products.find((p) => p.id === Number(stockMovement.productId))
+    if (!product || !product.stock_control) {
+      alert("Produto não encontrado ou não tem controle de estoque")
+      return
+    }
+
+    const quantity = Number(stockMovement.quantity)
+    let newStock = product.stock_quantity || 0
+
+    if (stockMovementType === "entrada") {
+      newStock += quantity
+    } else if (stockMovementType === "saida") {
+      newStock = Math.max(0, newStock - quantity)
+    }
+
+    try {
+      // Atualizar estoque do produto
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: Number(stockMovement.productId),
+          stock_quantity: newStock,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Erro ao atualizar estoque")
+
+      // Registrar movimentação
+      const movement = {
+        id: Date.now(),
+        productId: Number(stockMovement.productId),
+        productName: product.name,
+        type: stockMovementType,
+        quantity,
+        unit: "unidade",
+        reason: stockMovement.reason,
+        date: new Date().toLocaleString("pt-BR"),
+        user: "Admin",
+      }
+      setStockMovements((prev) => [movement, ...prev])
+
+      // Atualizar lista de produtos
+      await loadProducts()
+      setStockMovement({ productId: "", quantity: "", reason: "" })
+      alert(`${stockMovementType === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`)
+    } catch (error) {
+      console.error("Erro ao registrar movimentação:", error)
+      alert("Erro ao registrar movimentação")
+    }
+  }
+
   const addManualTransaction = async () => {
     if (newTransaction.amount && newTransaction.description) {
       try {
@@ -761,20 +802,22 @@ const AdminPanel = () => {
       total: 0,
       entradas: 0,
       saidas: 0,
-      byPaymentMethod: {},
+      byPaymentMethod: {} as { [key: string]: number },
       transactionCount: filteredTransactions.length,
       automaticCount: filteredTransactions.filter((t) => t.isAutomatic).length,
       manualCount: filteredTransactions.filter((t) => !t.isAutomatic).length,
     }
 
     filteredTransactions.forEach((transaction) => {
-      const amount = transaction.type === "entrada" ? transaction.amount : -transaction.amount
+      const numAmount =
+        typeof transaction.amount === "string" ? Number.parseFloat(transaction.amount) : transaction.amount
+      const amount = transaction.type === "entrada" ? numAmount : -numAmount
       summary.total += amount
 
       if (transaction.type === "entrada") {
-        summary.entradas += transaction.amount
+        summary.entradas += numAmount
       } else {
-        summary.saidas += transaction.amount
+        summary.saidas += numAmount
       }
 
       if (!summary.byPaymentMethod[transaction.paymentMethod]) {
@@ -791,17 +834,19 @@ const AdminPanel = () => {
       total: 0,
       entradas: 0,
       saidas: 0,
-      byPaymentMethod: {},
+      byPaymentMethod: {} as { [key: string]: number },
     }
 
     cashTransactions.forEach((transaction) => {
-      const amount = transaction.type === "entrada" ? transaction.amount : -transaction.amount
+      const numAmount =
+        typeof transaction.amount === "string" ? Number.parseFloat(transaction.amount) : transaction.amount
+      const amount = transaction.type === "entrada" ? numAmount : -numAmount
       summary.total += amount
 
       if (transaction.type === "entrada") {
-        summary.entradas += transaction.amount
+        summary.entradas += numAmount
       } else {
-        summary.saidas += transaction.amount
+        summary.saidas += numAmount
       }
 
       if (!summary.byPaymentMethod[transaction.paymentMethod]) {
@@ -880,36 +925,45 @@ const AdminPanel = () => {
     setStockMovements((prev) => [movement, ...prev])
   }
 
-  const balanceStock = (productId: number, newStock: number, reason: string) => {
+  const balanceStock = async (productId: number, newStock: number, reason: string) => {
     const product = products.find((p) => p.id === productId)
     if (!product) return
 
-    const oldStock = product.stock
-    const difference = newStock - oldStock
-    const movementType = difference >= 0 ? "entrada" : "saida"
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: productId,
+          stock_quantity: newStock,
+        }),
+      })
 
-    setProducts((prev) =>
-      prev.map((product) => {
-        if (product.id === productId) {
-          return { ...product, stock: newStock }
-        }
-        return product
-      }),
-    )
+      if (!response.ok) throw new Error("Erro ao atualizar estoque")
 
-    // Registrar movimentação de balanço
-    const movement = {
-      id: Date.now(),
-      productId,
-      productName: product.name,
-      type: "balanco" as any,
-      quantity: Math.abs(difference),
-      unit: "unidade" as any,
-      reason: `Balanço: ${reason} (${oldStock} → ${newStock})`,
-      date: new Date().toLocaleString("pt-BR"),
-      user: "Admin",
+      const oldStock = product.stock_quantity || 0
+      const difference = newStock - oldStock
+
+      // Registrar movimentação de balanço
+      const movement = {
+        id: Date.now(),
+        productId,
+        productName: product.name,
+        type: "ajuste",
+        quantity: Math.abs(difference),
+        unit: "unidade",
+        reason: `Ajuste: ${reason} (${oldStock} → ${newStock})`,
+        date: new Date().toLocaleString("pt-BR"),
+        user: "Admin",
+      }
+      setStockMovements((prev) => [movement, ...prev])
+
+      await loadProducts()
+      alert("Estoque ajustado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao ajustar estoque:", error)
+      alert("Erro ao ajustar estoque")
     }
-    setStockMovements((prev) => [movement, ...prev])
   }
 
   const balanceCash = async (newBalance: number, reason: string) => {
@@ -1373,7 +1427,7 @@ const AdminPanel = () => {
           </TabsContent>
 
           {/* Produtos */}
-          {activeTab === "products" && (
+          <TabsContent value="products">
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Gerenciar Produtos</h2>
@@ -1685,7 +1739,7 @@ const AdminPanel = () => {
                 </CardContent>
               </Card>
             </div>
-          )}
+          </TabsContent>
 
           {/* Categorias */}
           <TabsContent value="categories">
@@ -1751,94 +1805,180 @@ const AdminPanel = () => {
                 <CardDescription>Acompanhe e ajuste o estoque de seus produtos</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="stock-product">Produto</Label>
-                      <Select onValueChange={(value) => setStockBalance({ ...stockBalance, productId: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um produto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id.toString()}>
-                              {product.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="stock-new">Novo Estoque</Label>
-                      <Input
-                        id="stock-new"
-                        type="number"
-                        value={stockBalance.newStock}
-                        onChange={(e) => setStockBalance({ ...stockBalance, newStock: e.target.value })}
-                        placeholder="Quantidade"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="stock-reason">Motivo</Label>
-                      <Textarea
-                        id="stock-reason"
-                        value={stockBalance.reason}
-                        onChange={(e) => setStockBalance({ ...stockBalance, reason: e.target.value })}
-                        placeholder="Motivo do ajuste"
-                      />
+                <div className="space-y-6">
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Movimentação de Estoque</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label>Tipo de Movimentação</Label>
+                          <Select value={stockMovementType} onValueChange={(value: any) => setStockMovementType(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="entrada">Entrada</SelectItem>
+                              <SelectItem value="saida">Saída</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Produto</Label>
+                          <Select onValueChange={(value) => setStockMovement({ ...stockMovement, productId: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products
+                                .filter((p) => p.stock_control)
+                                .map((product) => (
+                                  <SelectItem key={product.id} value={product.id.toString()}>
+                                    {product.name} (Estoque: {product.stock_quantity || 0})
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={stockMovement.quantity}
+                            onChange={(e) => setStockMovement({ ...stockMovement, quantity: e.target.value })}
+                            placeholder="Quantidade"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Motivo</Label>
+                        <Textarea
+                          value={stockMovement.reason}
+                          onChange={(e) => setStockMovement({ ...stockMovement, reason: e.target.value })}
+                          placeholder="Motivo da movimentação"
+                        />
+                      </div>
+                      <Button onClick={addStockMovement}>
+                        {stockMovementType === "entrada" ? "Registrar Entrada" : "Registrar Saída"}
+                      </Button>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => {
-                      if (stockBalance.productId && stockBalance.newStock && stockBalance.reason) {
-                        balanceStock(Number(stockBalance.productId), Number(stockBalance.newStock), stockBalance.reason)
-                        setStockBalance({ productId: "", newStock: "", reason: "" })
-                      }
-                    }}
-                  >
-                    Ajustar Estoque
-                  </Button>
-                </div>
 
-                <div className="mt-8">
-                  <h3 className="text-xl font-bold mb-4">Movimentação de Estoque</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full leading-normal">
-                      <thead>
-                        <tr>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Produto
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Tipo
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Quantidade
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Motivo
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Data
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stockMovements.map((movement) => (
-                          <tr key={movement.id}>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              {movement.productName}
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.type}</td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              {movement.quantity} {movement.unit}
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.reason}</td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.date}</td>
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Ajuste de Estoque</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="stock-product">Produto</Label>
+                          <Select onValueChange={(value) => setStockBalance({ ...stockBalance, productId: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products
+                                .filter((p) => p.stock_control)
+                                .map((product) => (
+                                  <SelectItem key={product.id} value={product.id.toString()}>
+                                    {product.name} (Estoque atual: {product.stock_quantity || 0})
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="stock-new">Novo Estoque</Label>
+                          <Input
+                            id="stock-new"
+                            type="number"
+                            min="0"
+                            value={stockBalance.newStock}
+                            onChange={(e) => setStockBalance({ ...stockBalance, newStock: e.target.value })}
+                            placeholder="Quantidade"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label htmlFor="stock-reason">Motivo</Label>
+                          <Textarea
+                            id="stock-reason"
+                            value={stockBalance.reason}
+                            onChange={(e) => setStockBalance({ ...stockBalance, reason: e.target.value })}
+                            placeholder="Motivo do ajuste"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (stockBalance.productId && stockBalance.newStock && stockBalance.reason) {
+                            balanceStock(
+                              Number(stockBalance.productId),
+                              Number(stockBalance.newStock),
+                              stockBalance.reason,
+                            )
+                            setStockBalance({ productId: "", newStock: "", reason: "" })
+                          }
+                        }}
+                      >
+                        Ajustar Estoque
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-8">
+                    <h3 className="text-xl font-bold mb-4">Histórico de Movimentações</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full leading-normal">
+                        <thead>
+                          <tr>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Produto
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Tipo
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Quantidade
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Motivo
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Data
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {stockMovements.map((movement) => (
+                            <tr key={movement.id}>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {movement.productName}
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <span
+                                  className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    movement.type === "entrada"
+                                      ? "bg-green-100 text-green-800"
+                                      : movement.type === "saida"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {movement.type === "entrada"
+                                    ? "Entrada"
+                                    : movement.type === "saida"
+                                      ? "Saída"
+                                      : "Ajuste"}
+                                </span>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {movement.quantity} {movement.unit}
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.reason}</td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.date}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -2059,11 +2199,18 @@ const AdminPanel = () => {
                               </div>
                             </td>
                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <p className="text-gray-900 whitespace-no-wrap">R$ {transaction.amount.toFixed(2)}</p>
+                              <p className="text-gray-900 whitespace-no-wrap">
+                                R${" "}
+                                {(typeof transaction.amount === "string"
+                                  ? Number.parseFloat(transaction.amount)
+                                  : transaction.amount
+                                ).toFixed(2)}
+                              </p>
                             </td>
                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                               <p className="text-gray-900 whitespace-no-wrap">
-                                {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label}
+                                {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label ||
+                                  transaction.paymentMethod}
                               </p>
                             </td>
                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
@@ -2109,6 +2256,7 @@ const AdminPanel = () => {
                         setCashBalance({ newBalance: "", reason: "" })
                       }
                     }}
+                    className="mt-4"
                   >
                     Ajustar Saldo
                   </Button>
