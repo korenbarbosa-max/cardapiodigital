@@ -257,12 +257,18 @@ const AdminPanel = () => {
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
 
-  const [stockMovementType, setStockMovementType] = useState<"entrada" | "saida" | "ajuste">("entrada")
-  const [stockMovement, setStockMovement] = useState({
+  const stockMovementType = useState<"entrada" | "saida" | "ajuste">("entrada")[0]
+  const setStockMovementType = useState<"entrada" | "saida" | "ajuste">("entrada")[1]
+  const stockMovement = useState({
     productId: "",
     quantity: "",
     reason: "",
-  })
+  })[0]
+  const setStockMovement = useState({
+    productId: "",
+    quantity: "",
+    reason: "",
+  })[1]
 
   const [cashBalance, setCashBalance] = useState({
     newBalance: "",
@@ -682,6 +688,29 @@ const AdminPanel = () => {
     }
   }
 
+  const enableStockControl = async (productId: number) => {
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: productId,
+          stock_control: true,
+          stock_quantity: 0,
+        }),
+      })
+
+      if (response.ok) {
+        await loadProducts()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Erro ao habilitar controle de estoque:", error)
+      return false
+    }
+  }
+
   const addStockMovement = async () => {
     if (!stockMovement.productId || !stockMovement.quantity || !stockMovement.reason) {
       alert("Preencha todos os campos")
@@ -689,9 +718,23 @@ const AdminPanel = () => {
     }
 
     const product = products.find((p) => p.id === Number(stockMovement.productId))
-    if (!product || !product.stock_control) {
-      alert("Produto não encontrado ou não tem controle de estoque")
+    if (!product) {
+      alert("Produto não encontrado")
       return
+    }
+
+    // Se o produto não tem controle de estoque, perguntar se deseja habilitar
+    if (!product.stock_control) {
+      const enable = confirm(
+        `O produto "${product.name}" não tem controle de estoque habilitado.\n\nDeseja habilitar o controle de estoque para este produto?`,
+      )
+      if (!enable) return
+
+      const enabled = await enableStockControl(product.id)
+      if (!enabled) {
+        alert("Erro ao habilitar controle de estoque")
+        return
+      }
     }
 
     const quantity = Number(stockMovement.quantity)
@@ -701,6 +744,8 @@ const AdminPanel = () => {
       newStock += quantity
     } else if (stockMovementType === "saida") {
       newStock = Math.max(0, newStock - quantity)
+    } else if (stockMovementType === "ajuste") {
+      newStock = quantity
     }
 
     try {
@@ -733,7 +778,9 @@ const AdminPanel = () => {
       // Atualizar lista de produtos
       await loadProducts()
       setStockMovement({ productId: "", quantity: "", reason: "" })
-      alert(`${stockMovementType === "entrada" ? "Entrada" : "Saída"} registrada com sucesso!`)
+      alert(
+        `${stockMovementType === "entrada" ? "Entrada" : stockMovementType === "saida" ? "Saída" : "Ajuste"} registrada com sucesso!`,
+      )
     } catch (error) {
       console.error("Erro ao registrar movimentação:", error)
       alert("Erro ao registrar movimentação")
@@ -928,6 +975,20 @@ const AdminPanel = () => {
   const balanceStock = async (productId: number, newStock: number, reason: string) => {
     const product = products.find((p) => p.id === productId)
     if (!product) return
+
+    // Se o produto não tem controle de estoque, habilitar
+    if (!product.stock_control) {
+      const enable = confirm(
+        `O produto "${product.name}" não tem controle de estoque habilitado.\n\nDeseja habilitar o controle de estoque para este produto?`,
+      )
+      if (!enable) return
+
+      const enabled = await enableStockControl(product.id)
+      if (!enabled) {
+        alert("Erro ao habilitar controle de estoque")
+        return
+      }
+    }
 
     try {
       const response = await fetch("/api/products", {
@@ -1819,6 +1880,7 @@ const AdminPanel = () => {
                             <SelectContent>
                               <SelectItem value="entrada">Entrada</SelectItem>
                               <SelectItem value="saida">Saída</SelectItem>
+                              <SelectItem value="ajuste">Ajuste</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1829,13 +1891,14 @@ const AdminPanel = () => {
                               <SelectValue placeholder="Selecione um produto" />
                             </SelectTrigger>
                             <SelectContent>
-                              {products
-                                .filter((p) => p.stock_control)
-                                .map((product) => (
-                                  <SelectItem key={product.id} value={product.id.toString()}>
-                                    {product.name} (Estoque: {product.stock_quantity || 0})
-                                  </SelectItem>
-                                ))}
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id.toString()}>
+                                  {product.name}
+                                  {product.stock_control
+                                    ? ` (Estoque: ${product.stock_quantity || 0})`
+                                    : " (Sem controle)"}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -1859,13 +1922,17 @@ const AdminPanel = () => {
                         />
                       </div>
                       <Button onClick={addStockMovement}>
-                        {stockMovementType === "entrada" ? "Registrar Entrada" : "Registrar Saída"}
+                        {stockMovementType === "entrada"
+                          ? "Registrar Entrada"
+                          : stockMovementType === "saida"
+                            ? "Registrar Saída"
+                            : "Registrar Ajuste"}
                       </Button>
                     </div>
                   </div>
 
                   <div className="border rounded-lg p-4">
-                    <h3 className="text-lg font-semibold mb-4">Ajuste de Estoque</h3>
+                    <h3 className="text-lg font-semibold mb-4">Ajuste Direto de Estoque</h3>
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -1875,13 +1942,14 @@ const AdminPanel = () => {
                               <SelectValue placeholder="Selecione um produto" />
                             </SelectTrigger>
                             <SelectContent>
-                              {products
-                                .filter((p) => p.stock_control)
-                                .map((product) => (
-                                  <SelectItem key={product.id} value={product.id.toString()}>
-                                    {product.name} (Estoque atual: {product.stock_quantity || 0})
-                                  </SelectItem>
-                                ))}
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id.toString()}>
+                                  {product.name}
+                                  {product.stock_control
+                                    ? ` (Estoque atual: ${product.stock_quantity || 0})`
+                                    : " (Sem controle)"}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
