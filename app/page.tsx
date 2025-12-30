@@ -171,6 +171,8 @@ export default function DigitalMenu() {
     if (Object.keys(cart).length === 0) return
 
     const orderData = {
+      customer_name: customerData.name,
+      customer_phone: customerData.phone,
       items: Object.entries(cart).map(([cartKey, cartItem]) => {
         const itemId = Number.parseInt(cartKey.split("-")[0])
         const item = visibleProducts.find((item) => item.id === itemId)
@@ -182,7 +184,6 @@ export default function DigitalMenu() {
           extras: cartItem.extras,
         }
       }),
-      customer: customerData,
       total: getCartTotal(),
       status: "pendente",
     }
@@ -247,8 +248,8 @@ export default function DigitalMenu() {
     if (whatsappConfig.phone && lastOrder) {
       let message = `${whatsappConfig.message}\n\n`
       message += `*PEDIDO #${lastOrder.id}*\n\n`
-      message += `*Cliente:* ${lastOrder.customer.name}\n`
-      message += `*Telefone:* ${lastOrder.customer.phone}\n`
+      message += `*Cliente:* ${lastOrder.customer_name}\n`
+      message += `*Telefone:* ${lastOrder.customer_phone}\n`
       message += `*Endereço:* ${lastOrder.customer.address}\n`
       message += `*Pagamento:* ${lastOrder.customer.paymentMethod}\n\n`
       message += `*ITENS:*\n`

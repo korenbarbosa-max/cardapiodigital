@@ -211,6 +211,9 @@ const AdminPanel = () => {
     description: "",
     image: "",
     visibleInMenu: true,
+    stockControl: false,
+    stockQuantity: 0,
+    perKilo: false,
     extras: [] as { name: string; price: number }[],
   })
 
@@ -451,11 +454,14 @@ const AdminPanel = () => {
     setEditingProduct(product.id)
     setEditForm({
       name: product.name || "",
-      category: product.category || "",
+      category: product.category_id ? product.category_id.toString() : "",
       price: product.price ? product.price.toString() : "",
       description: product.description || "",
       image: product.image || "",
-      visibleInMenu: product.visibleInMenu ?? true,
+      visibleInMenu: product.visible ?? true,
+      stockControl: product.stock_control ?? false,
+      stockQuantity: product.stock_quantity ?? 0,
+      perKilo: product.per_kilo ?? false,
       extras: product.extras || [],
     })
   }
@@ -1329,7 +1335,7 @@ const AdminPanel = () => {
                       <Label htmlFor="product-category">Categoria</Label>
                       <Select
                         value={newProduct.category}
-                        onChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                        onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione uma categoria" />
@@ -1467,7 +1473,7 @@ const AdminPanel = () => {
                               <Label>Categoria</Label>
                               <Select
                                 value={editForm.category}
-                                onChange={(value) => setEditForm({ ...editForm, category: value })}
+                                onValueChange={(value) => setEditForm({ ...editForm, category: value })}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
