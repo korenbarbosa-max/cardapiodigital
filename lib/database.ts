@@ -55,6 +55,56 @@ export async function getCategories(): Promise<Category[]> {
   return result as Category[]
 }
 
+export async function createCategory(name: string): Promise<Category> {
+  const result = await sql`
+    INSERT INTO categories (name)
+    VALUES (${name})
+    RETURNING *
+  `
+  return result[0] as Category
+}
+
+export async function ensureDefaultCategories(): Promise<void> {
+  const defaultCategories = ["Lanches", "Bebidas", "Sobremesas", "Pratos Principais", "Petiscos"]
+
+  for (const categoryName of defaultCategories) {
+    try {
+      // Verificar se a categoria já existe
+      const existing = await sql`
+        SELECT id FROM categories WHERE name = ${categoryName}
+      `
+
+      // Se não existir, criar
+      if (existing.length === 0) {
+        await sql`
+          INSERT INTO categories (name) 
+          VALUES (${categoryName})
+        `
+      }
+    } catch (error) {
+      console.error(`Error creating category ${categoryName}:`, error)
+    }
+  }
+}
+
+export async function addCategory(name: string): Promise<Category> {
+  return await createCategory(name)
+}
+
+export async function updateCategory(id: number, newName: string): Promise<Category> {
+  const result = await sql`
+    UPDATE categories 
+    SET name = ${newName}, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `
+  return result[0] as Category
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  await sql`DELETE FROM categories WHERE id = ${id}`
+}
+
 // Funções para Produtos
 export async function getProducts(): Promise<Product[]> {
   const result = await sql`

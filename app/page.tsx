@@ -51,24 +51,32 @@ export default function DigitalMenu() {
         setLoading(true)
 
         // Load products from database
-        const productsResponse = await fetch("/api/products")
+        const productsResponse = await fetch("/api/products?visible=true") // Carregando apenas produtos visíveis
         if (productsResponse.ok) {
           const productsData = await productsResponse.json()
+          console.log("[v0] Produtos carregados:", productsData)
           setProducts(productsData)
 
-          // Extract categories from products
-          const uniqueCategories = Array.from(
-            new Set(
-              productsData
-                .filter((product: any) => product.visible_in_menu && product.status === "ativo")
-                .map((product: any) => product.category),
-            ),
-          )
-          setCategories(uniqueCategories)
+          // Load categories from database
+          const categoriesResponse = await fetch("/api/categories")
+          if (categoriesResponse.ok) {
+            const categoriesData = await categoriesResponse.json()
+            console.log("[v0] Categorias carregadas:", categoriesData)
 
-          // Set first category as active
-          if (uniqueCategories.length > 0) {
-            setActiveCategory(uniqueCategories[0])
+            const uniqueCategories = Array.from(
+              new Set(
+                productsData
+                  .filter((product: any) => product.visible) // Usando visible ao invés de visible_in_menu
+                  .map((product: any) => product.category_name), // Usando category_name que vem do JOIN
+              ),
+            ).filter(Boolean) // Remove valores undefined/null
+
+            setCategories(uniqueCategories)
+
+            // Set first category as active
+            if (uniqueCategories.length > 0) {
+              setActiveCategory(uniqueCategories[0])
+            }
           }
         }
       } catch (error) {
@@ -80,9 +88,7 @@ export default function DigitalMenu() {
           setProducts(parsedProducts)
           const uniqueCategories = Array.from(
             new Set(
-              parsedProducts
-                .filter((product: any) => product.visibleInMenu && product.status === "ativo")
-                .map((product: any) => product.category),
+              parsedProducts.filter((product: any) => product.visibleInMenu).map((product: any) => product.category),
             ),
           )
           setCategories(uniqueCategories)
@@ -99,11 +105,11 @@ export default function DigitalMenu() {
   }, [])
 
   const visibleProducts = products.filter(
-    (product) => (product.visible_in_menu || product.visibleInMenu) && product.status === "ativo",
+    (product) => product.visible, // Usando visible ao invés de visible_in_menu
   )
 
   const getProductsByCategory = (category: string) => {
-    return visibleProducts.filter((product) => product.category === category)
+    return visibleProducts.filter((product) => product.category_name === category) // Usando category_name
   }
 
   const addToCartWithExtras = (itemId: number, extras: { name: string; price: number }[] = []) => {
