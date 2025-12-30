@@ -342,8 +342,12 @@ export default function DigitalMenu() {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <Link href="/admin" className="hidden sm:inline-block">
-                <Button variant="outline" size="sm">
+              <Link href="/admin">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="px-3 sm:px-4 h-9 border-orange-500 text-orange-600 hover:bg-orange-50 bg-transparent"
+                >
                   <Settings className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Admin</span>
                 </Button>
