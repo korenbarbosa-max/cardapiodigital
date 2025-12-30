@@ -271,6 +271,30 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const loadCashTransactions = async () => {
+      try {
+        const response = await fetch("/api/cash")
+        if (response.ok) {
+          const transactions = await response.json()
+          setCashTransactions(
+            transactions.map((t: any) => ({
+              ...t,
+              paymentMethod: "dinheiro",
+              timestamp: new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+              date: new Date(t.created_at).toISOString().split("T")[0],
+              isAutomatic: false,
+            })),
+          )
+        }
+      } catch (error) {
+        console.error("Erro ao carregar transações:", error)
+      }
+    }
+
+    loadCashTransactions()
+  }, [])
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const savedAuth = localStorage.getItem("admin_authenticated")
       const savedCredentials = localStorage.getItem("admin_credentials")
@@ -675,26 +699,46 @@ const AdminPanel = () => {
     }
   }
 
-  const addManualTransaction = () => {
+  const addManualTransaction = async () => {
     if (newTransaction.amount && newTransaction.description) {
-      const transaction = {
-        id: `manual-${Date.now()}`,
-        type: newTransaction.type,
-        amount: Number.parseFloat(newTransaction.amount),
-        paymentMethod: newTransaction.paymentMethod,
-        description: newTransaction.description,
-        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        date: new Date().toISOString().split("T")[0],
-        isAutomatic: false,
-      }
+      try {
+        const response = await fetch("/api/cash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: newTransaction.type,
+            amount: Number.parseFloat(newTransaction.amount),
+            description: newTransaction.description,
+            // Include paymentMethod if it's needed by the API
+            paymentMethod: newTransaction.paymentMethod,
+          }),
+        })
 
-      setCashTransactions((prev) => [transaction, ...prev])
-      setNewTransaction({
-        type: "entrada",
-        amount: "",
-        paymentMethod: "dinheiro",
-        description: "",
-      })
+        if (response.ok) {
+          const transaction = await response.json()
+          setCashTransactions((prev) => [
+            {
+              ...transaction,
+              paymentMethod: newTransaction.paymentMethod,
+              timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              date: new Date(transaction.created_at).toISOString().split("T")[0],
+              isAutomatic: false,
+            },
+            ...prev,
+          ])
+          setNewTransaction({
+            type: "entrada",
+            amount: "",
+            paymentMethod: "dinheiro",
+            description: "",
+          })
+        }
+      } catch (error) {
+        console.error("Erro ao adicionar transação:", error)
+      }
     }
   }
 
@@ -868,7 +912,7 @@ const AdminPanel = () => {
     setStockMovements((prev) => [movement, ...prev])
   }
 
-  const balanceCash = (newBalance: number, reason: string) => {
+  const balanceCash = async (newBalance: number, reason: string) => {
     const currentBalance = cashTransactions.reduce((total, transaction) => {
       return transaction.type === "entrada" ? total + transaction.amount : total - transaction.amount
     }, 0)
@@ -876,18 +920,38 @@ const AdminPanel = () => {
     const difference = newBalance - currentBalance
     const transactionType = difference >= 0 ? "entrada" : "saida"
 
-    const transaction = {
-      id: `balance-${Date.now()}`,
-      type: transactionType,
-      amount: Math.abs(difference),
-      paymentMethod: "ajuste",
-      description: `Balanço de Caixa: ${reason} (R$ ${currentBalance.toFixed(2)} → R$ ${newBalance.toFixed(2)})`,
-      timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      date: new Date().toISOString().split("T")[0],
-      isAutomatic: false,
-    }
+    try {
+      const response = await fetch("/api/cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: transactionType,
+          amount: Math.abs(difference),
+          description: `Balanço de Caixa: ${reason} (R$ ${currentBalance.toFixed(2)} → R$ ${newBalance.toFixed(2)})`,
+          // Assuming 'ajuste' is a valid paymentMethod or handled internally
+          paymentMethod: "ajuste",
+        }),
+      })
 
-    setCashTransactions((prev) => [transaction, ...prev])
+      if (response.ok) {
+        const transaction = await response.json()
+        setCashTransactions((prev) => [
+          {
+            ...transaction,
+            paymentMethod: "ajuste",
+            timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            date: new Date(transaction.created_at).toISOString().split("T")[0],
+            isAutomatic: false,
+          },
+          ...prev,
+        ])
+      }
+    } catch (error) {
+      console.error("Erro ao ajustar saldo:", error)
+    }
   }
 
   const processOrder = (order: any) => {
