@@ -31,6 +31,9 @@ import {
   LogOut,
   ArrowLeft,
   Check,
+  BarChart3,
+  Package,
+  Tag,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -1235,30 +1238,29 @@ const AdminPanel = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <Settings className="w-6 h-6 text-white" />
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <Settings className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Painel Administrativo</h1>
-                <p className="text-sm text-gray-600">Restaurante Delícia</p>
+                <h1 className="text-base sm:text-xl font-bold text-gray-900">Admin</h1>
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Restaurante Delícia</p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Sair
+            <div className="flex items-center space-x-1 sm:space-x-3">
+              <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 sm:h-9 bg-transparent">
+                <LogOut className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sair</span>
               </Button>
 
               <Link href="/">
-                <Button variant="outline">
-                  <Home className="w-4 h-4 mr-2" />
-                  Voltar ao Cardápio
+                <Button variant="outline" size="sm" className="h-8 sm:h-9 bg-transparent">
+                  <Home className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Cardápio</span>
                 </Button>
               </Link>
             </div>
@@ -1266,50 +1268,99 @@ const AdminPanel = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="orders">Pedidos</TabsTrigger>
-            <TabsTrigger value="products">Produtos</TabsTrigger>
-            <TabsTrigger value="categories">Categorias</TabsTrigger>
-            <TabsTrigger value="stock">Estoque</TabsTrigger>
-            <TabsTrigger value="cash">Caixa</TabsTrigger>
-            <TabsTrigger value="settings">Configurações</TabsTrigger>
-          </TabsList>
+          <div className="relative mb-4 sm:mb-6">
+            <TabsList className="w-full flex overflow-x-auto scrollbar-hide gap-1 h-auto p-1">
+              <TabsTrigger
+                value="dashboard"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Dashboard</span>
+                <span className="sm:hidden">Home</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="orders"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                Pedidos
+              </TabsTrigger>
+              <TabsTrigger
+                value="products"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <Package className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                Produtos
+              </TabsTrigger>
+              <TabsTrigger
+                value="categories"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <Tag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Categorias</span>
+                <span className="sm:hidden">Cat.</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="stock"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                Estoque
+              </TabsTrigger>
+              <TabsTrigger
+                value="cash"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                Caixa
+              </TabsTrigger>
+              <TabsTrigger
+                value="settings"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+              >
+                <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Configurações</span>
+                <span className="sm:hidden">Config</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pedidos Hoje</CardTitle>
-                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Pedidos Hoje</CardTitle>
+                  <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalOrders}</div>
+                  <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
                   <p className="text-xs text-muted-foreground">{stats.pendingOrders} pendentes</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Faturamento</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Faturamento</CardTitle>
+                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
+                  <div className="text-xl sm:text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
                   <p className="text-xs text-muted-foreground">Hoje</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Produtos Ativos</CardTitle>
-                  <Receipt className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Produtos Ativos</CardTitle>
+                  <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{products.filter((p) => p.status === "ativo").length}</div>
+                  <div className="text-xl sm:text-2xl font-bold">
+                    {products.filter((p) => p.status === "ativo").length}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {products.filter((p) => p.status === "inativo").length} inativos
                   </p>

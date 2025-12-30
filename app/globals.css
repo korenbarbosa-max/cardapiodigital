@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -121,5 +121,50 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Adicionando estilos para melhorar a experiência mobile */
+@layer utilities {
+  /* Ocultar scrollbar mas permitir scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Scroll suave em dispositivos móveis */
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Melhorar área de toque em dispositivos móveis */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* Prevenir zoom em inputs no iOS */
+  @media screen and (max-width: 768px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Melhorar legibilidade em telas pequenas */
+  @media screen and (max-width: 640px) {
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
   }
 }
