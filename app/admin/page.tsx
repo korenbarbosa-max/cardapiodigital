@@ -595,7 +595,6 @@ const AdminPanel = () => {
             visibleInMenu: true,
             extras: [],
           })
-          console.log("[v0] Produto adicionado com sucesso:", createdProduct)
         } else {
           const errorData = await response.text()
           console.error("[v0] Erro na resposta da API:", errorData)

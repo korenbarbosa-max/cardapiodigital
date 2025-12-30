@@ -36,7 +36,7 @@ export default function DigitalMenu() {
   const [lastOrder, setLastOrder] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
   const [categories, setCategories] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [customerData, setCustomerData] = useState({
     name: "",
     phone: "",
@@ -48,32 +48,27 @@ export default function DigitalMenu() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        setLoading(true)
+        setIsLoading(true)
 
         // Load products from database
         const productsResponse = await fetch("/api/products?visible=true") // Carregando apenas produtos visíveis
         if (productsResponse.ok) {
           const productsData = await productsResponse.json()
-          console.log("[v0] Produtos carregados:", productsData)
           setProducts(productsData)
 
           // Load categories from database
           const categoriesResponse = await fetch("/api/categories")
           if (categoriesResponse.ok) {
             const categoriesData = await categoriesResponse.json()
-            console.log("[v0] Categorias carregadas:", categoriesData)
 
             const uniqueCategories = Array.from(
               new Set(
-                productsData
-                  .filter((product: any) => product.visible) // Usando visible ao invés de visible_in_menu
-                  .map((product: any) => product.category_name), // Usando category_name que vem do JOIN
+                productsData.filter((product: any) => product.visible).map((product: any) => product.category_name),
               ),
-            ).filter(Boolean) // Remove valores undefined/null
+            ).filter(Boolean)
 
             setCategories(uniqueCategories)
 
-            // Set first category as active
             if (uniqueCategories.length > 0) {
               setActiveCategory(uniqueCategories[0])
             }
@@ -97,7 +92,7 @@ export default function DigitalMenu() {
           }
         }
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -311,7 +306,7 @@ export default function DigitalMenu() {
     }, 3000)
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
         <div className="text-center">
