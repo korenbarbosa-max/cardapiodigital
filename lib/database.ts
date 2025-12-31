@@ -48,6 +48,15 @@ export interface CashTransaction {
   created_at?: string
 }
 
+export interface Extra {
+  id?: number
+  name: string
+  price: number
+  active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
 // Funções para Categorias
 export async function getCategories(): Promise<Category[]> {
   const supabase = await createClient()
@@ -279,4 +288,57 @@ export async function getCashBalance(): Promise<number> {
   }, 0)
 
   return balance
+}
+
+export async function getExtras(): Promise<Extra[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from("extras").select("*").order("name")
+
+  if (error) throw error
+  return data as Extra[]
+}
+
+export async function getActiveExtras(): Promise<Extra[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from("extras").select("*").eq("active", true).order("name")
+
+  if (error) throw error
+  return data as Extra[]
+}
+
+export async function createExtra(extra: Omit<Extra, "id" | "created_at" | "updated_at">): Promise<Extra> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("extras")
+    .insert({
+      name: extra.name,
+      price: extra.price,
+      active: extra.active,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as Extra
+}
+
+export async function updateExtra(id: number, extra: Partial<Extra>): Promise<Extra> {
+  const supabase = await createClient()
+
+  const updateData: any = { updated_at: new Date().toISOString() }
+  if (extra.name !== undefined) updateData.name = extra.name
+  if (extra.price !== undefined) updateData.price = extra.price
+  if (extra.active !== undefined) updateData.active = extra.active
+
+  const { data, error } = await supabase.from("extras").update(updateData).eq("id", id).select().single()
+
+  if (error) throw error
+  return data as Extra
+}
+
+export async function deleteExtra(id: number): Promise<void> {
+  const supabase = await createClient()
+  const { error } = await supabase.from("extras").delete().eq("id", id)
+
+  if (error) throw error
 }

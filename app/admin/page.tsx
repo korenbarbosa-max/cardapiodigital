@@ -34,6 +34,8 @@ import {
   BarChart3,
   Package,
   Tag,
+  Save,
+  Trash,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -174,7 +176,25 @@ const transactionTypes = [
 ]
 
 const AdminPanel = () => {
+  const [stockMovementType, setStockMovementType] = useState<"entrada" | "saida" | "ajuste">("entrada")
+  const [stockMovement, setStockMovement] = useState({
+    productId: "",
+    quantity: "",
+    reason: "",
+  })
   const [stockMovements, setStockMovements] = useState<any[]>([])
+
+  const [extras, setExtras] = useState<Array<{ id: string; name: string; price: number }>>([])
+  const [extraForm, setExtraForm] = useState({
+    name: "",
+    price: "",
+  })
+  const [editingExtra, setEditingExtra] = useState<string | null>(null)
+
+  // Existing states
+  const [newExtraGlobal, setNewExtraGlobal] = useState({ name: "", price: "", active: true }) // This seems to be for global extras, which might be different from product-specific extras
+  // const [editingExtra, setEditingExtra] = useState<any>(null) // This was likely a duplicate, replaced by the new one above
+
   const [stockAlert, setStockAlert] = useState(5) // Alerta quando estoque <= 5
   const [stockUnit, setStockUnit] = useState<"unidade" | "kilo">("unidade")
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -220,8 +240,8 @@ const AdminPanel = () => {
     extras: [] as { name: string; price: number }[],
   })
 
-  const [newExtra, setNewExtra] = useState({ name: "", price: "" })
-  const [editExtra, setEditExtra] = useState({ name: "", price: "" })
+  const [newExtra, setNewExtra] = useState({ name: "", price: "" }) // Acréscimo para um produto específico
+  const [editExtra, setEditExtra] = useState({ name: "", price: "" }) // Acréscimo para edição de um produto específico
   const [editingProduct, setEditingProduct] = useState<number | null>(null)
 
   const [cashTransactions, setCashTransactions] = useState([
@@ -255,23 +275,10 @@ const AdminPanel = () => {
   const [whatsappConfig, setWhatsappConfig] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("whatsappConfig")
-      return saved ? JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
+      return saved ? JSON.JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
     }
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
-
-  const stockMovementType = useState<"entrada" | "saida" | "ajuste">("entrada")[0]
-  const setStockMovementType = useState<"entrada" | "saida" | "ajuste">("entrada")[1]
-  const stockMovement = useState({
-    productId: "",
-    quantity: "",
-    reason: "",
-  })[0]
-  const setStockMovement = useState({
-    productId: "",
-    quantity: "",
-    reason: "",
-  })[1]
 
   const [cashBalance, setCashBalance] = useState({
     newBalance: "",
@@ -341,68 +348,185 @@ const AdminPanel = () => {
     }
   }
 
-  useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        setLoading(true)
-        await loadProducts()
-        await loadCategories()
-        await loadOrders()
+  const loadExtras = () => {
+    const savedExtras = localStorage.getItem("extras")
+    if (savedExtras) {
+      setExtras(JSON.parse(savedExtras))
+    }
+  }
 
-        const savedCredentials = localStorage.getItem("admin_credentials")
-        if (savedCredentials) {
-          setCredentials(JSON.parse(savedCredentials))
-        }
-
-        const isAuthenticatedFromStorage = localStorage.getItem("admin_authenticated")
-        if (isAuthenticatedFromStorage === "true") {
-          setIsAuthenticated(true)
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error)
-      } finally {
-        setLoading(false)
+  // Global extras functions (kept for now, but might need refactoring if they overlap with `extras`)
+  const loadGlobalExtras = async () => {
+    // Temporariamente desabilitado - aguardando criação da tabela extras no Supabase
+    // Para usar acréscimos agora, use a aba "Acréscimos" que salva no localStorage
+    console.log("Sistema de acréscimos usando localStorage temporariamente")
+    /*
+    try {
+      const response = await fetch("/api/extras")
+      if (response.ok) {
+        const data = await response.json()
+        // Assuming the API returns an array of extras
+        // setNewExtraGlobal should be replaced with a state that holds an array
+        // For now, commenting out the incorrect assignment
+        // setNewExtraGlobal(data)
+      } else if (response.status === 404) {
+        // Table doesn't exist yet, silently ignore
+        console.log("Tabela extras ainda não foi criada no banco de dados")
       }
+    } catch (error) {
+      console.log("Aguardando criação da tabela extras no banco de dados")
+    }
+    */
+  }
+  // </CHANGE>
+
+  const addExtraGlobal = async () => {
+    if (!newExtraGlobal.name || !newExtraGlobal.price) {
+      alert("Preencha todos os campos")
+      return
     }
 
-    loadInitialData()
+    try {
+      const response = await fetch("/api/extras", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newExtraGlobal.name,
+          price: Number.parseFloat(newExtraGlobal.price),
+          active: newExtraGlobal.active,
+        }),
+      })
+
+      if (response.ok) {
+        await loadGlobalExtras() // Reload global extras
+        setNewExtraGlobal({ name: "", price: "", active: true })
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar acréscimo global:", error)
+    }
+  }
+
+  const updateExtraGlobal = async () => {
+    if (!newExtraGlobal.name || !newExtraGlobal.price) {
+      // Assuming editing the global extra
+      alert("Preencha todos os campos")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/extras", {
+        // Assuming this API endpoint updates global extras
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Assuming API expects ID if updating, but the state `newExtraGlobal` doesn't have ID
+          name: newExtraGlobal.name,
+          price: Number.parseFloat(newExtraGlobal.price),
+          active: newExtraGlobal.active,
+        }),
+      })
+
+      if (response.ok) {
+        await loadGlobalExtras() // Reload global extras
+        alert("Acréscimo global atualizado com sucesso!")
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar acréscimo global:", error)
+    }
+  }
+
+  const deleteExtraGlobal = async (id: number) => {
+    // Assuming global extras have numeric IDs
+    if (!confirm("Tem certeza que deseja excluir este acréscimo global?")) return
+
+    try {
+      const response = await fetch(`/api/extras?id=${id}`, {
+        // Assuming API supports deletion by ID
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        await loadGlobalExtras() // Reload global extras
+      }
+    } catch (error) {
+      console.error("Erro ao excluir acréscimo global:", error)
+    }
+  }
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      await loadProducts()
+      await loadCategories()
+
+      loadExtras() // Load product-specific extras from localStorage
+      // loadGlobalExtras() // Load global extras - temporariamente desabilitado
+      // </CHANGE>
+
+      const savedCredentials = localStorage.getItem("admin_credentials")
+      if (savedCredentials) {
+        setCredentials(JSON.parse(savedCredentials))
+      }
+
+      const isAuthenticatedFromStorage = localStorage.getItem("admin_authenticated")
+      if (isAuthenticatedFromStorage === "true") {
+        setIsAuthenticated(true)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados iniciais:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadCashTransactions = async () => {
+    try {
+      const response = await fetch("/api/cash")
+      if (response.ok) {
+        const transactions = await response.json()
+        setCashTransactions(
+          transactions.map((t: any) => ({
+            ...t,
+            amount: Number.parseFloat(t.amount) || 0,
+            paymentMethod: t.paymentMethod || "dinheiro",
+            timestamp: new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            date: new Date(t.created_at).toISOString().split("T")[0],
+            isAutomatic: false,
+          })),
+        )
+      }
+    } catch (error) {
+      console.error("Erro ao carregar transações:", error)
+    }
+  }
+
+  // Inicializa os dados ao montar o componente
+  useEffect(() => {
+    loadData()
+    // loadOrders() already called in loadData
+    loadCashTransactions() // Ensure cash transactions are loaded
+    loadExtras()
+
+    const interval = setInterval(() => {
+      loadOrders() // Poll orders
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
-  // Load cash transactions from API
-  useEffect(() => {
-    const loadCashTransactions = async () => {
-      try {
-        const response = await fetch("/api/cash")
-        if (response.ok) {
-          const transactions = await response.json()
-          setCashTransactions(
-            transactions.map((t: any) => ({
-              ...t,
-              amount: Number.parseFloat(t.amount) || 0,
-              paymentMethod: t.paymentMethod || "dinheiro",
-              timestamp: new Date(t.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-              date: new Date(t.created_at).toISOString().split("T")[0],
-              isAutomatic: false,
-            })),
-          )
-        }
-      } catch (error) {
-        console.error("Erro ao carregar transações:", error)
-      }
-    }
-
-    if (isAuthenticated) {
-      loadCashTransactions()
-    }
-  }, [isAuthenticated])
-
-  // Load orders from API with polling
+  // Load cash transactions from API based on authentication
   useEffect(() => {
     if (!isAuthenticated) return
-
-    const interval = setInterval(loadOrders, 5000)
-    return () => clearInterval(interval)
+    loadCashTransactions()
   }, [isAuthenticated])
+
+  // Load orders from API with polling - Already handled in the main useEffect
+  // useEffect(() => {
+  //   if (!isAuthenticated) return
+
+  //   const interval = setInterval(loadOrders, 5000)
+  //   return () => clearInterval(interval)
+  // }, [isAuthenticated])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1159,6 +1283,55 @@ const AdminPanel = () => {
     }
   }
 
+  const addExtra = () => {
+    if (extraForm.name && extraForm.price) {
+      setExtras((prev) => [
+        ...prev,
+        { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
+      ])
+      setExtraForm({ name: "", price: "" })
+      localStorage.setItem(
+        "extras",
+        JSON.stringify([
+          ...extras,
+          { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
+        ]),
+      )
+    }
+  }
+
+  const saveEditExtra = () => {
+    if (editingExtra && extraForm.name && extraForm.price) {
+      setExtras((prev) =>
+        prev.map((extra) =>
+          extra.id === editingExtra
+            ? { ...extra, name: extraForm.name, price: Number.parseFloat(extraForm.price) }
+            : extra,
+        ),
+      )
+      setEditingExtra(null)
+      setExtraForm({ name: "", price: "" })
+      localStorage.setItem("extras", JSON.stringify(extras))
+    }
+  }
+
+  const cancelEditExtra = () => {
+    setEditingExtra(null)
+    setExtraForm({ name: "", price: "" })
+  }
+
+  const startEditExtra = (extra: { id: string; name: string; price: number }) => {
+    setEditingExtra(extra.id)
+    setExtraForm({ name: extra.name, price: extra.price.toString() })
+  }
+
+  const deleteExtra = (extraId: string) => {
+    if (confirm("Tem certeza que deseja excluir este acréscimo?")) {
+      setExtras((prev) => prev.filter((extra) => extra.id !== extraId))
+      localStorage.setItem("extras", JSON.stringify(extras.filter((extra) => extra.id !== extraId)))
+    }
+  }
+
   if (loading && isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1270,62 +1443,59 @@ const AdminPanel = () => {
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="relative mb-4 sm:mb-6">
-            <TabsList className="w-full flex overflow-x-auto scrollbar-hide gap-1 h-auto p-1">
-              <TabsTrigger
-                value="dashboard"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Dashboard</span>
-                <span className="sm:hidden">Home</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="orders"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                Pedidos
-              </TabsTrigger>
-              <TabsTrigger
-                value="products"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <Package className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                Produtos
-              </TabsTrigger>
-              <TabsTrigger
-                value="categories"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <Tag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Categorias</span>
-                <span className="sm:hidden">Cat.</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="stock"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                Estoque
-              </TabsTrigger>
-              <TabsTrigger
-                value="cash"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                Caixa
-              </TabsTrigger>
-              <TabsTrigger
-                value="settings"
-                className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
-              >
-                <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Configurações</span>
-                <span className="sm:hidden">Config</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          {/* <TabsList className="w-full flex overflow-x-auto scrollbar-hide gap-1 h-auto p-1"> */}
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 h-auto p-1">
+            <TabsTrigger
+              value="dashboard"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Dashboard</span>
+              <span className="sm:hidden">Home</span>
+            </TabsTrigger>
+            <TabsTrigger value="extras" className="text-xs sm:text-sm px-2 py-1.5">
+              <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Acréscimos</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="orders"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Pedidos
+            </TabsTrigger>
+            <TabsTrigger
+              value="products"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Package className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Produtos
+            </TabsTrigger>
+            <TabsTrigger
+              value="categories"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Tag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Categorias</span>
+              <span className="sm:hidden">Cat.</span>
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Estoque
+            </TabsTrigger>
+            <TabsTrigger value="cash" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0">
+              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Caixa
+            </TabsTrigger>
+            <TabsTrigger
+              value="settings"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Configurações</span>
+              <span className="sm:hidden">Config</span>
+            </TabsTrigger>
+          </TabsList>
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
@@ -1909,6 +2079,133 @@ const AdminPanel = () => {
             </Card>
           </TabsContent>
 
+          {/* Acréscimos Tab Content */}
+          <TabsContent value="extras" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg sm:text-xl">Gerenciar Acréscimos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Formulário de Acréscimo */}
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-semibold">
+                    {editingExtra ? "Editar Acréscimo" : "Novo Acréscimo"}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <Label htmlFor="extra-name" className="text-sm">
+                        Nome do Acréscimo
+                      </Label>
+                      <Input
+                        id="extra-name"
+                        placeholder="Ex: Bacon, Queijo Extra..."
+                        value={extraForm.name}
+                        onChange={(e) => setExtraForm({ ...extraForm, name: e.target.value })}
+                        className="text-sm sm:text-base"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="extra-price" className="text-sm">
+                        Preço (R$)
+                      </Label>
+                      <Input
+                        id="extra-price"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={extraForm.price}
+                        onChange={(e) => setExtraForm({ ...extraForm, price: e.target.value })}
+                        className="text-sm sm:text-base"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {editingExtra ? (
+                      <>
+                        <Button onClick={saveEditExtra} className="flex-1 text-sm sm:text-base">
+                          <Save className="w-4 h-4 mr-2" />
+                          Salvar Alterações
+                        </Button>
+                        <Button
+                          onClick={cancelEditExtra}
+                          variant="outline"
+                          className="flex-1 text-sm sm:text-base bg-transparent"
+                        >
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={addExtra} className="w-full text-sm sm:text-base">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Acréscimo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de Acréscimos */}
+                <div className="space-y-3">
+                  <h3 className="text-base sm:text-lg font-semibold">Acréscimos Cadastrados</h3>
+                  {extras.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-6 sm:py-8 text-sm sm:text-base">
+                      Nenhum acréscimo cadastrado ainda
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                        <table className="min-w-full divide-y divide-border">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium">
+                                Nome
+                              </th>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium">
+                                Preço
+                              </th>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-medium">
+                                Ações
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border bg-background">
+                            {extras.map((extra) => (
+                              <tr key={extra.id} className="hover:bg-muted/50">
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">{extra.name}</td>
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                                  R$ {extra.price.toFixed(2)}
+                                </td>
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-right">
+                                  <div className="flex justify-end gap-1 sm:gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => startEditExtra(extra)}
+                                      className="h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
+                                    >
+                                      <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteExtra(extra.id)}
+                                      className="h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Estoque */}
           <TabsContent value="stock">
             <Card>
@@ -2069,30 +2366,32 @@ const AdminPanel = () => {
                           {stockMovements.map((movement) => (
                             <tr key={movement.id}>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                {movement.productName}
+                                {products.find((p) => p.id === movement.productId)?.name}
                               </td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                <span
-                                  className={`px-2 py-1 rounded text-xs font-semibold ${
+                                <Badge
+                                  variant={
                                     movement.type === "entrada"
-                                      ? "bg-green-100 text-green-800"
+                                      ? "default"
                                       : movement.type === "saida"
-                                        ? "bg-red-100 text-red-800"
-                                        : "bg-blue-100 text-blue-800"
-                                  }`}
+                                        ? "destructive"
+                                        : "secondary"
+                                  }
                                 >
                                   {movement.type === "entrada"
                                     ? "Entrada"
                                     : movement.type === "saida"
                                       ? "Saída"
                                       : "Ajuste"}
-                                </span>
+                                </Badge>
                               </td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                {movement.quantity} {movement.unit}
+                                {movement.quantity}
                               </td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.reason}</td>
-                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.date}</td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {new Date(movement.date).toLocaleDateString()}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -2223,62 +2522,60 @@ const AdminPanel = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold">Resumo do Período</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Total</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Entradas</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Saídas</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
-                      </Card>
-                    </div>
+                  <h4 className="text-lg font-semibold">Resumo do Período</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Total</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Entradas</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Saídas</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
+                    </Card>
+                  </div>
 
-                    <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
-                        <Card key={method}>
-                          <CardHeader>
-                            <CardTitle>{paymentMethods.find((m) => m.value === method)?.label || method}</CardTitle>
-                          </CardHeader>
-                          <CardContent>R$ {Number(amount).toFixed(2)}</CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                  <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
+                      <Card key={method}>
+                        <CardHeader>
+                          <CardTitle>{paymentMethods.find((m) => m.value === method)?.label || method}</CardTitle>
+                        </CardHeader>
+                        <CardContent>R$ {Number(amount).toFixed(2)}</CardContent>
+                      </Card>
+                    ))}
+                  </div>
 
-                    <h4 className="text-lg font-semibold">Contagem de Transações</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Total de Transações</CardTitle>
-                        </CardHeader>
-                        <CardContent>{filteredCashSummary.transactionCount}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Transações Automáticas</CardTitle>
-                        </CardHeader>
-                        <CardContent>{filteredCashSummary.automaticCount}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Transações Manuais</CardTitle>
-                        </CardHeader>
-                        <CardContent>{filteredCashSummary.manualCount}</CardContent>
-                      </Card>
-                    </div>
+                  <h4 className="text-lg font-semibold">Contagem de Transações</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Total de Transações</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.transactionCount}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Transações Automáticas</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.automaticCount}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Transações Manuais</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.manualCount}</CardContent>
+                    </Card>
                   </div>
 
                   <h3 className="text-xl font-bold mt-8 mb-4">Histórico de Transações</h3>
