@@ -45,7 +45,25 @@ export interface CashTransaction {
   type: "entrada" | "saida" | "balance"
   amount: number
   description?: string
+  session_id?: number
   created_at?: string
+}
+
+export interface CashSession {
+  id?: number
+  status: "aberto" | "fechado"
+  opening_amount: number
+  closing_amount?: number
+  expected_amount?: number
+  difference?: number
+  opened_by?: string
+  closed_by?: string
+  opening_notes?: string
+  closing_notes?: string
+  opened_at?: string
+  closed_at?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Extra {
@@ -257,12 +275,17 @@ export async function createCashTransaction(
   transaction: Omit<CashTransaction, "id" | "created_at">,
 ): Promise<CashTransaction> {
   const supabase = await createClient()
+
+  // Obter sessão ativa
+  const activeSession = await getActiveCashSession()
+
   const { data, error } = await supabase
     .from("cash_transactions")
     .insert({
       type: transaction.type,
       amount: transaction.amount,
       description: transaction.description || null,
+      session_id: activeSession?.id || null,
     })
     .select()
     .single()
@@ -341,4 +364,123 @@ export async function deleteExtra(id: number): Promise<void> {
   const { error } = await supabase.from("extras").delete().eq("id", id)
 
   if (error) throw error
+}
+
+// Funções para gerenciar sessões de caixa
+export async function getActiveCashSession(): Promise<CashSession | null> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("cash_sessions")
+    .select("*")
+    .eq("status", "aberto")
+    .order("opened_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error) {
+    if (error.code === "PGRST116") return null // No rows returned
+    throw error
+  }
+  return data as CashSession
+}
+
+export async function getCashSessions(): Promise<CashSession[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("cash_sessions")
+    .select("*")
+    .order("opened_at", { ascending: false })
+    .limit(30)
+
+  if (error) throw error
+  return data as CashSession[]
+}
+
+export async function openCashSession(
+  session: Omit<CashSession, "id" | "status" | "opened_at" | "created_at" | "updated_at">,
+): Promise<CashSession> {
+  const supabase = await createClient()
+
+  // Verificar se já existe uma sessão aberta
+  const activeSession = await getActiveCashSession()
+  if (activeSession) {
+    throw new Error("Já existe uma sessão de caixa aberta")
+  }
+
+  const { data, error } = await supabase
+    .from("cash_sessions")
+    .insert({
+      status: "aberto",
+      opening_amount: session.opening_amount,
+      opened_by: session.opened_by,
+      opening_notes: session.opening_notes || null,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as CashSession
+}
+
+export async function closeCashSession(
+  sessionId: number,
+  closeData: {
+    closing_amount: number
+    closed_by?: string
+    closing_notes?: string
+  },
+): Promise<CashSession> {
+  const supabase = await createClient()
+
+  // Calcular o valor esperado baseado nas transações
+  const { data: transactions } = await supabase
+    .from("cash_transactions")
+    .select("type, amount")
+    .eq("session_id", sessionId)
+
+  const session = await supabase.from("cash_sessions").select("opening_amount").eq("id", sessionId).single()
+
+  let expectedAmount = Number(session.data?.opening_amount || 0)
+  if (transactions) {
+    transactions.forEach((t) => {
+      if (t.type === "entrada") {
+        expectedAmount += Number(t.amount)
+      } else if (t.type === "saida") {
+        expectedAmount -= Number(t.amount)
+      }
+    })
+  }
+
+  const difference = closeData.closing_amount - expectedAmount
+
+  const { data, error } = await supabase
+    .from("cash_sessions")
+    .update({
+      status: "fechado",
+      closing_amount: closeData.closing_amount,
+      expected_amount: expectedAmount,
+      difference: difference,
+      closed_by: closeData.closed_by || null,
+      closing_notes: closeData.closing_notes || null,
+      closed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as CashSession
+}
+
+export async function getCashTransactionsBySession(sessionId: number): Promise<CashTransaction[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("cash_transactions")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+  return data as CashTransaction[]
 }
