@@ -3,7 +3,42 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Settings, CreditCard, Banknote, Smartphone, TrendingUp, TrendingDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Settings,
+  Plus,
+  Edit,
+  Trash2,
+  DollarSign,
+  ShoppingBag,
+  Printer,
+  Home,
+  Receipt,
+  X,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  TrendingUp,
+  TrendingDown,
+  Lock,
+  LogOut,
+  ArrowLeft,
+  Check,
+  BarChart3,
+  Package,
+  Tag,
+  Save,
+  Trash,
+} from "lucide-react"
+import Link from "next/link"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 const DEFAULT_CREDENTIALS = {
   username: "admin",
@@ -223,21 +258,6 @@ const AdminPanel = () => {
     })),
   ])
 
-  const [activeCashSession, setActiveCashSession] = useState<any>(null)
-  const [cashSessions, setCashSessions] = useState<any[]>([])
-  const [openCashForm, setOpenCashForm] = useState({
-    opening_amount: "",
-    opened_by: "",
-    opening_notes: "",
-  })
-  const [closeCashForm, setCloseCashForm] = useState({
-    closing_amount: "",
-    closed_by: "",
-    closing_notes: "",
-  })
-  const [showOpenCashDialog, setShowOpenCashDialog] = useState(false)
-  const [showCloseCashDialog, setShowCloseCashDialog] = useState(false)
-
   const [newTransaction, setNewTransaction] = useState({
     type: "entrada",
     amount: "",
@@ -255,7 +275,7 @@ const AdminPanel = () => {
   const [whatsappConfig, setWhatsappConfig] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("whatsappConfig")
-      return saved ? JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
+      return saved ? JSON.JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
     }
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
@@ -480,122 +500,12 @@ const AdminPanel = () => {
     }
   }
 
-  const loadActiveCashSession = async () => {
-    try {
-      const response = await fetch("/api/cash-sessions?action=active")
-      if (response.ok) {
-        const session = await response.json()
-        setActiveCashSession(session)
-      } else if (response.status === 404) {
-        // Tabela não existe, sessões desabilitadas
-        setActiveCashSession(null)
-      }
-    } catch (error) {
-      console.log("Erro ao carregar sessão ativa:", error)
-      setActiveCashSession(null)
-    }
-    // </CHANGE>
-  }
-
-  const loadCashSessions = async () => {
-    try {
-      const response = await fetch("/api/cash-sessions")
-      if (response.ok) {
-        const data = await response.json()
-        setCashSessions(data)
-      } else if (response.status === 404) {
-        // Tabela não existe, sessões desabilitadas
-        console.log("Sistema de sessões de caixa não disponível")
-        setCashSessions([])
-      }
-    } catch (error) {
-      console.log("Erro ao carregar sessões de caixa:", error)
-      setCashSessions([])
-    }
-    // </CHANGE>
-  }
-
-  const handleOpenCash = async () => {
-    if (!openCashForm.opening_amount) {
-      alert("Por favor, informe o valor de abertura")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/cash-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          opening_amount: Number.parseFloat(openCashForm.opening_amount),
-          opened_by: openCashForm.opened_by || "Administrador",
-          opening_notes: openCashForm.opening_notes,
-        }),
-      })
-
-      if (response.ok) {
-        const session = await response.json()
-        setActiveCashSession(session)
-        setShowOpenCashDialog(false)
-        setOpenCashForm({ opening_amount: "", opened_by: "", opening_notes: "" })
-        alert("Caixa aberto com sucesso!")
-        loadCashSessions()
-      } else {
-        const error = await response.json()
-        alert(error.error || "Erro ao abrir caixa")
-      }
-    } catch (error) {
-      console.error("Erro ao abrir caixa:", error)
-      alert("Erro ao abrir caixa")
-    }
-  }
-
-  const handleCloseCash = async () => {
-    if (!closeCashForm.closing_amount || !activeCashSession) {
-      alert("Por favor, informe o valor de fechamento")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/cash-sessions", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: activeCashSession.id,
-          closing_amount: Number.parseFloat(closeCashForm.closing_amount),
-          closed_by: closeCashForm.closed_by || "Administrador",
-          closing_notes: closeCashForm.closing_notes,
-        }),
-      })
-
-      if (response.ok) {
-        const session = await response.json()
-        setActiveCashSession(null)
-        setShowCloseCashDialog(false)
-        setCloseCashForm({ closing_amount: "", closed_by: "", closing_notes: "" })
-
-        // Mostrar resumo do fechamento
-        const difference = session.difference || 0
-        const message = `Caixa fechado com sucesso!\n\nValor esperado: R$ ${session.expected_amount?.toFixed(2)}\nValor contado: R$ ${session.closing_amount?.toFixed(2)}\nDiferença: R$ ${difference.toFixed(2)} ${difference > 0 ? "(Sobra)" : difference < 0 ? "(Falta)" : ""}`
-        alert(message)
-
-        loadCashSessions()
-      } else {
-        alert("Erro ao fechar caixa")
-      }
-    } catch (error) {
-      console.error("Erro ao fechar caixa:", error)
-      alert("Erro ao fechar caixa")
-    }
-  }
-
   // Inicializa os dados ao montar o componente
   useEffect(() => {
     loadData()
-    loadCashTransactions()
+    // loadOrders() already called in loadData
+    loadCashTransactions() // Ensure cash transactions are loaded
     loadExtras()
-    // loadActiveCashSession()
-    // loadCashSessions()
-    // </CHANGE>
 
     const interval = setInterval(() => {
       loadOrders() // Poll orders
@@ -609,6 +519,14 @@ const AdminPanel = () => {
     if (!isAuthenticated) return
     loadCashTransactions()
   }, [isAuthenticated])
+
+  // Load orders from API with polling - Already handled in the main useEffect
+  // useEffect(() => {
+  //   if (!isAuthenticated) return
+
+  //   const interval = setInterval(loadOrders, 5000)
+  //   return () => clearInterval(interval)
+  // }, [isAuthenticated])
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -892,12 +810,1967 @@ const AdminPanel = () => {
           setProducts((prev) => prev.map((p) => (p.id === productId ? updatedProduct : p)))
         }
       } catch (error) {
-        console.error("Erro ao atualizar status do produto:", error)
+        console.error("Erro ao alterar status do produto:", error)
       }
     }
   }
 
-  return <div>{/* Component content goes here */}</div>
+  const enableStockControl = async (productId: number) => {
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: productId,
+          stock_control: true,
+          stock_quantity: 0,
+        }),
+      })
+
+      if (response.ok) {
+        await loadProducts()
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("Erro ao habilitar controle de estoque:", error)
+      return false
+    }
+  }
+
+  const addStockMovement = async () => {
+    if (!stockMovement.productId || !stockMovement.quantity || !stockMovement.reason) {
+      alert("Preencha todos os campos")
+      return
+    }
+
+    const product = products.find((p) => p.id === Number(stockMovement.productId))
+    if (!product) {
+      alert("Produto não encontrado")
+      return
+    }
+
+    // Se o produto não tem controle de estoque, perguntar se deseja habilitar
+    if (!product.stock_control) {
+      const enable = confirm(
+        `O produto "${product.name}" não tem controle de estoque habilitado.\n\nDeseja habilitar o controle de estoque para este produto?`,
+      )
+      if (!enable) return
+
+      const enabled = await enableStockControl(product.id)
+      if (!enabled) {
+        alert("Erro ao habilitar controle de estoque")
+        return
+      }
+    }
+
+    const quantity = Number(stockMovement.quantity)
+    let newStock = product.stock_quantity || 0
+
+    if (stockMovementType === "entrada") {
+      newStock += quantity
+    } else if (stockMovementType === "saida") {
+      newStock = Math.max(0, newStock - quantity)
+    } else if (stockMovementType === "ajuste") {
+      newStock = quantity
+    }
+
+    try {
+      // Atualizar estoque do produto
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: Number(stockMovement.productId),
+          stock_quantity: newStock,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Erro ao atualizar estoque")
+
+      // Registrar movimentação
+      const movement = {
+        id: Date.now(),
+        productId: Number(stockMovement.productId),
+        productName: product.name,
+        type: stockMovementType,
+        quantity,
+        unit: "unidade",
+        reason: stockMovement.reason,
+        date: new Date().toLocaleString("pt-BR"),
+        user: "Admin",
+      }
+      setStockMovements((prev) => [movement, ...prev])
+
+      // Atualizar lista de produtos
+      await loadProducts()
+      setStockMovement({ productId: "", quantity: "", reason: "" })
+      alert(
+        `${stockMovementType === "entrada" ? "Entrada" : stockMovementType === "saida" ? "Saída" : "Ajuste"} registrada com sucesso!`,
+      )
+    } catch (error) {
+      console.error("Erro ao registrar movimentação:", error)
+      alert("Erro ao registrar movimentação")
+    }
+  }
+
+  const addManualTransaction = async () => {
+    if (newTransaction.amount && newTransaction.description) {
+      try {
+        const response = await fetch("/api/cash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: newTransaction.type,
+            amount: Number.parseFloat(newTransaction.amount),
+            description: newTransaction.description,
+            // Include paymentMethod if it's needed by the API
+            paymentMethod: newTransaction.paymentMethod,
+          }),
+        })
+
+        if (response.ok) {
+          const transaction = await response.json()
+          setCashTransactions((prev) => [
+            {
+              ...transaction,
+              paymentMethod: newTransaction.paymentMethod,
+              timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              date: new Date(transaction.created_at).toISOString().split("T")[0],
+              isAutomatic: false,
+            },
+            ...prev,
+          ])
+          setNewTransaction({
+            type: "entrada",
+            amount: "",
+            paymentMethod: "dinheiro",
+            description: "",
+          })
+        }
+      } catch (error) {
+        console.error("Erro ao adicionar transação:", error)
+      }
+    }
+  }
+
+  const getFilteredTransactions = () => {
+    return cashTransactions.filter((transaction) => {
+      const transactionDate = transaction.date
+      const isInDateRange = transactionDate >= reportFilters.startDate && transactionDate <= reportFilters.endDate
+      const matchesPaymentMethod =
+        reportFilters.paymentMethod === "todos" || transaction.paymentMethod === reportFilters.paymentMethod
+      const matchesType =
+        reportFilters.transactionType === "todos" || transaction.type === reportFilters.transactionType
+
+      return isInDateRange && matchesPaymentMethod && matchesType
+    })
+  }
+
+  const getFilteredCashSummary = () => {
+    const filteredTransactions = getFilteredTransactions()
+    const summary = {
+      total: 0,
+      entradas: 0,
+      saidas: 0,
+      byPaymentMethod: {} as { [key: string]: number },
+      transactionCount: filteredTransactions.length,
+      automaticCount: filteredTransactions.filter((t) => t.isAutomatic).length,
+      manualCount: filteredTransactions.filter((t) => !t.isAutomatic).length,
+    }
+
+    filteredTransactions.forEach((transaction) => {
+      const numAmount =
+        typeof transaction.amount === "string" ? Number.parseFloat(transaction.amount) : transaction.amount
+      const amount = transaction.type === "entrada" ? numAmount : -numAmount
+      summary.total += amount
+
+      if (transaction.type === "entrada") {
+        summary.entradas += numAmount
+      } else {
+        summary.saidas += numAmount
+      }
+
+      if (!summary.byPaymentMethod[transaction.paymentMethod]) {
+        summary.byPaymentMethod[transaction.paymentMethod] = 0
+      }
+      summary.byPaymentMethod[transaction.paymentMethod] += amount
+    })
+
+    return summary
+  }
+
+  const getCashSummary = () => {
+    const summary = {
+      total: 0,
+      entradas: 0,
+      saidas: 0,
+      byPaymentMethod: {} as { [key: string]: number },
+    }
+
+    cashTransactions.forEach((transaction) => {
+      const numAmount =
+        typeof transaction.amount === "string" ? Number.parseFloat(transaction.amount) : transaction.amount
+      const amount = transaction.type === "entrada" ? numAmount : -numAmount
+      summary.total += amount
+
+      if (transaction.type === "entrada") {
+        summary.entradas += numAmount
+      } else {
+        summary.saidas += numAmount
+      }
+
+      if (!summary.byPaymentMethod[transaction.paymentMethod]) {
+        summary.byPaymentMethod[transaction.paymentMethod] = 0
+      }
+      summary.byPaymentMethod[transaction.paymentMethod] += amount
+    })
+
+    return summary
+  }
+
+  const getProductSalesData = () => {
+    const productSales: { [key: string]: number } = {}
+
+    // Contar vendas de cada produto nos pedidos
+    orders.forEach((order) => {
+      order.items.forEach((item) => {
+        if (productSales[item.name]) {
+          productSales[item.name] += item.quantity
+        } else {
+          productSales[item.name] = item.quantity
+        }
+      })
+    })
+
+    // Converter para array e ordenar por quantidade vendida
+    return Object.entries(productSales)
+      .map(([name, quantity]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + "..." : name,
+        fullName: name,
+        quantity,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 8) // Top 8 produtos
+  }
+
+  const stats = {
+    totalOrders: orders.length,
+    totalRevenue: orders.reduce((sum, order) => sum + order.total, 0),
+    pendingOrders: orders.filter((order) => order.status === "pendente").length,
+  }
+
+  const cashSummary = getCashSummary()
+  const filteredCashSummary = getFilteredCashSummary()
+  const productSalesData = getProductSalesData()
+
+  const updateStock = (
+    productId: number,
+    quantity: number,
+    type: "entrada" | "saida",
+    reason: string,
+    unit: "unidade" | "kilo" = "unidade",
+  ) => {
+    setProducts((prev) =>
+      prev.map((product) => {
+        if (product.id === productId) {
+          const newStock = type === "entrada" ? product.stock + quantity : product.stock - quantity
+          return { ...product, stock: Math.max(0, newStock) }
+        }
+        return product
+      }),
+    )
+
+    // Registrar movimentação
+    const movement = {
+      id: Date.now(),
+      productId,
+      productName: products.find((p) => p.id === productId)?.name,
+      type,
+      quantity,
+      unit,
+      reason,
+      date: new Date().toLocaleString("pt-BR"),
+      user: "Admin",
+    }
+    setStockMovements((prev) => [movement, ...prev])
+  }
+
+  const balanceStock = async (productId: number, newStock: number, reason: string) => {
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+
+    // Se o produto não tem controle de estoque, habilitar
+    if (!product.stock_control) {
+      const enable = confirm(
+        `O produto "${product.name}" não tem controle de estoque habilitado.\n\nDeseja habilitar o controle de estoque para este produto?`,
+      )
+      if (!enable) return
+
+      const enabled = await enableStockControl(product.id)
+      if (!enabled) {
+        alert("Erro ao habilitar controle de estoque")
+        return
+      }
+    }
+
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: productId,
+          stock_quantity: newStock,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Erro ao atualizar estoque")
+
+      const oldStock = product.stock_quantity || 0
+      const difference = newStock - oldStock
+
+      // Registrar movimentação de balanço
+      const movement = {
+        id: Date.now(),
+        productId,
+        productName: product.name,
+        type: "ajuste",
+        quantity: Math.abs(difference),
+        unit: "unidade",
+        reason: `Ajuste: ${reason} (${oldStock} → ${newStock})`,
+        date: new Date().toLocaleString("pt-BR"),
+        user: "Admin",
+      }
+      setStockMovements((prev) => [movement, ...prev])
+
+      await loadProducts()
+      alert("Estoque ajustado com sucesso!")
+    } catch (error) {
+      console.error("Erro ao ajustar estoque:", error)
+      alert("Erro ao ajustar estoque")
+    }
+  }
+
+  const balanceCash = async (newBalance: number, reason: string) => {
+    const currentBalance = cashTransactions.reduce((total, transaction) => {
+      return transaction.type === "entrada" ? total + transaction.amount : total - transaction.amount
+    }, 0)
+
+    const difference = newBalance - currentBalance
+    const transactionType = difference >= 0 ? "entrada" : "saida"
+
+    try {
+      const response = await fetch("/api/cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: transactionType,
+          amount: Math.abs(difference),
+          description: `Balanço de Caixa: ${reason} (R$ ${currentBalance.toFixed(2)} → R$ ${newBalance.toFixed(2)})`,
+          // Assuming 'ajuste' is a valid paymentMethod or handled internally
+          paymentMethod: "ajuste",
+        }),
+      })
+
+      if (response.ok) {
+        const transaction = await response.json()
+        setCashTransactions((prev) => [
+          {
+            ...transaction,
+            paymentMethod: "ajuste",
+            timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            date: new Date(transaction.created_at).toISOString().split("T")[0],
+            isAutomatic: false,
+          },
+          ...prev,
+        ])
+      }
+    } catch (error) {
+      console.error("Erro ao ajustar saldo:", error)
+    }
+  }
+
+  const processOrder = (order: any) => {
+    order.items.forEach((item: any) => {
+      updateStock(item.id, item.quantity, "saida", `Venda - Pedido #${order.id}`)
+    })
+
+    // Atualizar status do pedido para "processado"
+    updateOrderStatus(order.id, "processado")
+  }
+
+  const handleSaveWhatsappConfig = () => {
+    if (!whatsappConfig.phone) {
+      alert("Por favor, insira o número do WhatsApp")
+      return
+    }
+    localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig))
+    alert("Configuração do WhatsApp salva com sucesso!")
+  }
+
+  const addCategory = async () => {
+    if (newCategory.trim()) {
+      try {
+        const response = await fetch("/api/categories", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: newCategory.trim() }),
+        })
+
+        if (response.ok) {
+          const createdCategory = await response.json()
+          setCategories((prev) => [...prev, createdCategory])
+          setNewCategory("")
+        } else {
+          console.error("Erro ao adicionar categoria")
+        }
+      } catch (error) {
+        console.error("Erro ao adicionar categoria:", error)
+      }
+    }
+  }
+
+  const updateCategory = async (categoryId: number, newName: string) => {
+    try {
+      const response = await fetch("/api/categories", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: categoryId, name: newName }),
+      })
+
+      if (response.ok) {
+        const updatedCategory = await response.json()
+        setCategories((prev) => prev.map((cat) => (cat.id === categoryId ? updatedCategory : cat)))
+        setEditingCategory(null)
+        setEditCategoryName("")
+      } else {
+        console.error("Erro ao atualizar categoria")
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar categoria:", error)
+    }
+  }
+
+  const deleteCategory = async (categoryId: number) => {
+    if (confirm("Tem certeza que deseja deletar esta categoria?")) {
+      try {
+        const response = await fetch("/api/categories", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ id: categoryId }),
+        })
+
+        if (response.ok) {
+          setCategories((prev) => prev.filter((cat) => cat.id !== categoryId))
+        } else {
+          console.error("Erro ao deletar categoria")
+        }
+      } catch (error) {
+        console.error("Erro ao deletar categoria:", error)
+      }
+    }
+  }
+
+  const addExtra = () => {
+    if (extraForm.name && extraForm.price) {
+      setExtras((prev) => [
+        ...prev,
+        { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
+      ])
+      setExtraForm({ name: "", price: "" })
+      localStorage.setItem(
+        "extras",
+        JSON.stringify([
+          ...extras,
+          { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
+        ]),
+      )
+    }
+  }
+
+  const saveEditExtra = () => {
+    if (editingExtra && extraForm.name && extraForm.price) {
+      setExtras((prev) =>
+        prev.map((extra) =>
+          extra.id === editingExtra
+            ? { ...extra, name: extraForm.name, price: Number.parseFloat(extraForm.price) }
+            : extra,
+        ),
+      )
+      setEditingExtra(null)
+      setExtraForm({ name: "", price: "" })
+      localStorage.setItem("extras", JSON.stringify(extras))
+    }
+  }
+
+  const cancelEditExtra = () => {
+    setEditingExtra(null)
+    setExtraForm({ name: "", price: "" })
+  }
+
+  const startEditExtra = (extra: { id: string; name: string; price: number }) => {
+    setEditingExtra(extra.id)
+    setExtraForm({ name: extra.name, price: extra.price.toString() })
+  }
+
+  const deleteExtra = (extraId: string) => {
+    if (confirm("Tem certeza que deseja excluir este acréscimo?")) {
+      setExtras((prev) => prev.filter((extra) => extra.id !== extraId))
+      localStorage.setItem("extras", JSON.stringify(extras.filter((extra) => extra.id !== extraId)))
+    }
+  }
+
+  if (loading && isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando dados...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl">Acesso Administrativo</CardTitle>
+            <CardDescription>Entre com suas credenciais para acessar o painel</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="username">Usuário</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Digite seu usuário"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
+                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Digite sua senha"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+
+            {loginError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{loginError}</p>
+              </div>
+            )}
+
+            <Button className="w-full" onClick={handleLogin} disabled={!loginForm.username || !loginForm.password}>
+              <Lock className="w-4 h-4 mr-2" />
+              Entrar
+            </Button>
+
+            <Button variant="outline" className="w-full bg-transparent" onClick={() => (window.location.href = "/")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar ao Cardápio
+            </Button>
+
+            <div className="pt-4 border-t text-center">
+              <p className="text-sm text-gray-600">
+                <strong>Credenciais padrão:</strong>
+                <br />
+                Usuário: admin
+                <br />
+                Senha: 123456
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-14 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <Settings className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-xl font-bold text-gray-900">Admin</h1>
+                <p className="text-xs sm:text-sm text-gray-600 hidden sm:block">Restaurante Delícia</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-1 sm:space-x-3">
+              <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 sm:h-9 bg-transparent">
+                <LogOut className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
+
+              <Link href="/">
+                <Button variant="outline" size="sm" className="h-8 sm:h-9 bg-transparent">
+                  <Home className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Cardápio</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* <TabsList className="w-full flex overflow-x-auto scrollbar-hide gap-1 h-auto p-1"> */}
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 h-auto p-1">
+            <TabsTrigger
+              value="dashboard"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Dashboard</span>
+              <span className="sm:hidden">Home</span>
+            </TabsTrigger>
+            <TabsTrigger value="extras" className="text-xs sm:text-sm px-2 py-1.5">
+              <Plus className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Acréscimos</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="orders"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Pedidos
+            </TabsTrigger>
+            <TabsTrigger
+              value="products"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Package className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Produtos
+            </TabsTrigger>
+            <TabsTrigger
+              value="categories"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Tag className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Categorias</span>
+              <span className="sm:hidden">Cat.</span>
+            </TabsTrigger>
+            <TabsTrigger value="stock" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Estoque
+            </TabsTrigger>
+            <TabsTrigger value="cash" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0">
+              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              Caixa
+            </TabsTrigger>
+            <TabsTrigger
+              value="settings"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Configurações</span>
+              <span className="sm:hidden">Config</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Dashboard */}
+          <TabsContent value="dashboard">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium">Pedidos Hoje</CardTitle>
+                  <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">{stats.totalOrders}</div>
+                  <p className="text-xs text-muted-foreground">{stats.pendingOrders} pendentes</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium">Faturamento</CardTitle>
+                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">Hoje</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium">Produtos Ativos</CardTitle>
+                  <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl sm:text-2xl font-bold">
+                    {products.filter((p) => p.status === "ativo").length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {products.filter((p) => p.status === "inativo").length} inativos
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Produtos Mais Vendidos</CardTitle>
+                  <CardDescription>Frequência de vendas por produto</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={productSalesData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={12} />
+                      <YAxis />
+                      <Tooltip formatter={(value, name, props) => [`${value} vendidos`, props.payload.fullName]} />
+                      <Bar dataKey="quantity" fill="#f97316" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumo de Vendas</CardTitle>
+                  <CardDescription>Estatísticas dos produtos</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {productSalesData.slice(0, 5).map((product, index) => (
+                      <div key={product.fullName} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-bold text-orange-600">#{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{product.fullName}</p>
+                            <p className="text-sm text-gray-500">{product.quantity} vendidos</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-orange-500 h-2 rounded-full"
+                              style={{
+                                width: `${(product.quantity / Math.max(...productSalesData.map((p) => p.quantity))) * 100}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Pedidos Recentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orders.slice(0, 3).map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">
+                          Pedido #{order.id} - {order.mesa}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {order.items.length} itens • R$ {order.total.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={order.status === "pendente" ? "destructive" : "secondary"}>
+                          {order.status}
+                        </Badge>
+                        <span className="text-sm text-gray-500">{order.timestamp}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Pedidos */}
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Pedidos</CardTitle>
+                <CardDescription>Visualize e gerencie todos os pedidos em tempo real</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orders.map((order) => (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <CardTitle className="text-lg">Pedido #{order.id}</CardTitle>
+                            <CardDescription>
+                              {order.mesa} • {order.timestamp}
+                            </CardDescription>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Badge
+                              variant={
+                                order.status === "pendente"
+                                  ? "destructive"
+                                  : order.status === "preparando"
+                                    ? "default"
+                                    : "secondary"
+                              }
+                            >
+                              {order.status}
+                            </Badge>
+                            <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
+                              <Printer className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 mb-4">
+                          {order.items.map((item, index) => (
+                            <div key={index} className="flex justify-between">
+                              <span>
+                                {item.quantity}x {item.name}
+                              </span>
+                              <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                          <div className="border-t pt-2 font-bold flex justify-between">
+                            <span>Total:</span>
+                            <span>R$ {order.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "preparando")}
+                            disabled={order.status !== "pendente"}
+                          >
+                            Preparar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "pronto")}
+                            disabled={order.status !== "preparando"}
+                          >
+                            Pronto
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "entregue")}
+                            disabled={order.status !== "pronto"}
+                          >
+                            Entregar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Produtos */}
+          <TabsContent value="products">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Gerenciar Produtos</h2>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Adicionar Novo Produto</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="product-name">Nome do Produto</Label>
+                      <Input
+                        id="product-name"
+                        value={newProduct.name}
+                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                        placeholder="Nome do produto"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-category">Categoria</Label>
+                      <Select
+                        value={newProduct.category}
+                        onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="product-price">Preço (R$)</Label>
+                      <Input
+                        id="product-price"
+                        type="number"
+                        step="0.01"
+                        value={newProduct.price}
+                        onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-description">Descrição</Label>
+                      <Input
+                        id="product-description"
+                        value={newProduct.description}
+                        onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                        placeholder="Descrição do produto"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="product-image">Imagem do Produto</Label>
+                      <div className="space-y-2">
+                        <Input
+                          id="product-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleNewProductImageUpload}
+                          className="cursor-pointer"
+                        />
+                        {newProduct.image && (
+                          <div className="mt-2">
+                            <img
+                              src={newProduct.image || "/placeholder.svg"}
+                              alt="Preview"
+                              className="w-32 h-24 object-cover rounded-md border"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="md:col-span-2 flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="visible-menu"
+                        checked={newProduct.visibleInMenu}
+                        onChange={(e) => setNewProduct({ ...newProduct, visibleInMenu: e.target.checked })}
+                      />
+                      <Label htmlFor="visible-menu">Visível no cardápio</Label>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Acréscimos Disponíveis</Label>
+                      <div className="border rounded-lg p-4 space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nome do acréscimo (ex: Bacon)"
+                            value={newExtra.name}
+                            onChange={(e) => setNewExtra({ ...newExtra, name: e.target.value })}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Preço"
+                            value={newExtra.price}
+                            onChange={(e) => setNewExtra({ ...newExtra, price: e.target.value })}
+                            className="w-24"
+                          />
+                          <Button type="button" onClick={addExtraToNewProduct} size="sm">
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        {newProduct.extras.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Acréscimos adicionados:</p>
+                            {newProduct.extras.map((extra, index) => (
+                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                <span className="text-sm">
+                                  {extra.name} - R$ {extra.price.toFixed(2)}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeExtraFromNewProduct(index)}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button onClick={addNewProduct} className="mt-4">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Produto
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Lista de Produtos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {products.map((product) => (
+                      <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        {editingProduct === product.id ? (
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label>Nome</Label>
+                              <Input
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <Label>Categoria</Label>
+                              <Select
+                                value={editForm.category}
+                                onValueChange={(value) => setEditForm({ ...editForm, category: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categories.map((category) => (
+                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                      {category.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Preço (R$)</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editForm.price}
+                                onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <Label>Descrição</Label>
+                              <Input
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                              />
+                            </div>
+                            <div className="md:col-span-3">
+                              <Label>Imagem do Produto</Label>
+                              <div className="space-y-2">
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleEditImageUpload}
+                                  className="cursor-pointer"
+                                />
+                                {editForm.image && (
+                                  <div className="mt-2">
+                                    <img
+                                      src={editForm.image || "/placeholder.svg"}
+                                      alt="Preview"
+                                      className="w-32 h-24 object-cover rounded-md border"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="md:col-span-3 flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`visible-menu-${product.id}`}
+                                checked={editForm.visibleInMenu}
+                                onChange={(e) => setEditForm({ ...editForm, visibleInMenu: e.target.checked })}
+                              />
+                              <Label htmlFor={`visible-menu-${product.id}`}>Visível no cardápio</Label>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Acréscimos Disponíveis</Label>
+                              <div className="border rounded-lg p-4 space-y-3">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Nome do acréscimo (ex: Bacon)"
+                                    value={editExtra.name}
+                                    onChange={(e) => setEditExtra({ ...editExtra, name: e.target.value })}
+                                    className="flex-1"
+                                  />
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Preço"
+                                    value={editExtra.price}
+                                    onChange={(e) => setEditExtra({ ...editExtra, price: e.target.value })}
+                                    className="w-24"
+                                  />
+                                  <Button type="button" onClick={addExtraToEditProduct} size="sm">
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                </div>
+
+                                {editForm.extras.length > 0 && (
+                                  <div className="space-y-2">
+                                    <p className="text-sm font-medium">Acréscimos adicionados:</p>
+                                    {editForm.extras.map((extra, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between bg-gray-50 p-2 rounded"
+                                      >
+                                        <span className="text-sm">
+                                          {extra.name} - R$ {extra.price.toFixed(2)}
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeExtraFromEditProduct(index)}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="md:col-span-3 flex space-x-2">
+                              <Button onClick={saveEditProduct} size="sm">
+                                <Check className="w-4 h-4 mr-1" />
+                                Salvar
+                              </Button>
+                              <Button onClick={cancelEdit} variant="outline" size="sm">
+                                <X className="w-4 h-4 mr-1" />
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center space-x-4">
+                              <div className="w-16 h-12 bg-gray-100 rounded-md overflow-hidden">
+                                <img
+                                  src={product.image || "/placeholder.svg?height=48&width=64&query=food"}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div>
+                                <h3 className="font-medium">{product.name}</h3>
+                                <p className="text-sm text-gray-500">{product.category_name || "Sem categoria"}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Button variant="outline" size="sm" onClick={() => startEditProduct(product)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => deleteProduct(product.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Categorias */}
+          <TabsContent value="categories">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Categorias</CardTitle>
+                <CardDescription>Adicione, edite ou remova categorias de produtos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Nova categoria"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                    />
+                    <Button onClick={addCategory}>Adicionar</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {categories.map((category) => (
+                      <div key={category.id} className="flex items-center justify-between p-3 border rounded-md">
+                        {editingCategory === category.id ? (
+                          <div className="flex items-center space-x-2">
+                            <Input value={editCategoryName} onChange={(e) => setEditCategoryName(e.target.value)} />
+                            <Button onClick={() => updateCategory(category.id, editCategoryName)}>Salvar</Button>
+                            <Button variant="ghost" onClick={() => setEditingCategory(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span>{category.name}</span>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingCategory(category.id)
+                                  setEditCategoryName(category.name)
+                                }}
+                              >
+                                Editar
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => deleteCategory(category.id)}>
+                                Remover
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Acréscimos Tab Content */}
+          <TabsContent value="extras" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg sm:text-xl">Gerenciar Acréscimos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Formulário de Acréscimo */}
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-semibold">
+                    {editingExtra ? "Editar Acréscimo" : "Novo Acréscimo"}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <Label htmlFor="extra-name" className="text-sm">
+                        Nome do Acréscimo
+                      </Label>
+                      <Input
+                        id="extra-name"
+                        placeholder="Ex: Bacon, Queijo Extra..."
+                        value={extraForm.name}
+                        onChange={(e) => setExtraForm({ ...extraForm, name: e.target.value })}
+                        className="text-sm sm:text-base"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="extra-price" className="text-sm">
+                        Preço (R$)
+                      </Label>
+                      <Input
+                        id="extra-price"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={extraForm.price}
+                        onChange={(e) => setExtraForm({ ...extraForm, price: e.target.value })}
+                        className="text-sm sm:text-base"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {editingExtra ? (
+                      <>
+                        <Button onClick={saveEditExtra} className="flex-1 text-sm sm:text-base">
+                          <Save className="w-4 h-4 mr-2" />
+                          Salvar Alterações
+                        </Button>
+                        <Button
+                          onClick={cancelEditExtra}
+                          variant="outline"
+                          className="flex-1 text-sm sm:text-base bg-transparent"
+                        >
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={addExtra} className="w-full text-sm sm:text-base">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Acréscimo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de Acréscimos */}
+                <div className="space-y-3">
+                  <h3 className="text-base sm:text-lg font-semibold">Acréscimos Cadastrados</h3>
+                  {extras.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-6 sm:py-8 text-sm sm:text-base">
+                      Nenhum acréscimo cadastrado ainda
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                        <table className="min-w-full divide-y divide-border">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium">
+                                Nome
+                              </th>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium">
+                                Preço
+                              </th>
+                              <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs sm:text-sm font-medium">
+                                Ações
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border bg-background">
+                            {extras.map((extra) => (
+                              <tr key={extra.id} className="hover:bg-muted/50">
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">{extra.name}</td>
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm">
+                                  R$ {extra.price.toFixed(2)}
+                                </td>
+                                <td className="px-3 sm:px-4 py-2 sm:py-3 text-right">
+                                  <div className="flex justify-end gap-1 sm:gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => startEditExtra(extra)}
+                                      className="h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
+                                    >
+                                      <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteExtra(extra.id)}
+                                      className="h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Estoque */}
+          <TabsContent value="stock">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Estoque</CardTitle>
+                <CardDescription>Acompanhe e ajuste o estoque de seus produtos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Movimentação de Estoque</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label>Tipo de Movimentação</Label>
+                          <Select value={stockMovementType} onValueChange={(value: any) => setStockMovementType(value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="entrada">Entrada</SelectItem>
+                              <SelectItem value="saida">Saída</SelectItem>
+                              <SelectItem value="ajuste">Ajuste</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Produto</Label>
+                          <Select onValueChange={(value) => setStockMovement({ ...stockMovement, productId: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id.toString()}>
+                                  {product.name}
+                                  {product.stock_control
+                                    ? ` (Estoque: ${product.stock_quantity || 0})`
+                                    : " (Sem controle)"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={stockMovement.quantity}
+                            onChange={(e) => setStockMovement({ ...stockMovement, quantity: e.target.value })}
+                            placeholder="Quantidade"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Motivo</Label>
+                        <Textarea
+                          value={stockMovement.reason}
+                          onChange={(e) => setStockMovement({ ...stockMovement, reason: e.target.value })}
+                          placeholder="Motivo da movimentação"
+                        />
+                      </div>
+                      <Button onClick={addStockMovement}>
+                        {stockMovementType === "entrada"
+                          ? "Registrar Entrada"
+                          : stockMovementType === "saida"
+                            ? "Registrar Saída"
+                            : "Registrar Ajuste"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">Ajuste Direto de Estoque</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="stock-product">Produto</Label>
+                          <Select onValueChange={(value) => setStockBalance({ ...stockBalance, productId: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um produto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id.toString()}>
+                                  {product.name}
+                                  {product.stock_control
+                                    ? ` (Estoque atual: ${product.stock_quantity || 0})`
+                                    : " (Sem controle)"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="stock-new">Novo Estoque</Label>
+                          <Input
+                            id="stock-new"
+                            type="number"
+                            min="0"
+                            value={stockBalance.newStock}
+                            onChange={(e) => setStockBalance({ ...stockBalance, newStock: e.target.value })}
+                            placeholder="Quantidade"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label htmlFor="stock-reason">Motivo</Label>
+                          <Textarea
+                            id="stock-reason"
+                            value={stockBalance.reason}
+                            onChange={(e) => setStockBalance({ ...stockBalance, reason: e.target.value })}
+                            placeholder="Motivo do ajuste"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (stockBalance.productId && stockBalance.newStock && stockBalance.reason) {
+                            balanceStock(
+                              Number(stockBalance.productId),
+                              Number(stockBalance.newStock),
+                              stockBalance.reason,
+                            )
+                            setStockBalance({ productId: "", newStock: "", reason: "" })
+                          }
+                        }}
+                      >
+                        Ajustar Estoque
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-8">
+                    <h3 className="text-xl font-bold mb-4">Histórico de Movimentações</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full leading-normal">
+                        <thead>
+                          <tr>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Produto
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Tipo
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Quantidade
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Motivo
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Data
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stockMovements.map((movement) => (
+                            <tr key={movement.id}>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {products.find((p) => p.id === movement.productId)?.name}
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <Badge
+                                  variant={
+                                    movement.type === "entrada"
+                                      ? "default"
+                                      : movement.type === "saida"
+                                        ? "destructive"
+                                        : "secondary"
+                                  }
+                                >
+                                  {movement.type === "entrada"
+                                    ? "Entrada"
+                                    : movement.type === "saida"
+                                      ? "Saída"
+                                      : "Ajuste"}
+                                </Badge>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {movement.quantity}
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.reason}</td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                {new Date(movement.date).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Caixa */}
+          <TabsContent value="cash">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Caixa</CardTitle>
+                <CardDescription>Registre transações, visualize o histórico e ajuste o saldo</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="transaction-type">Tipo de Transação</Label>
+                      <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {transactionTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="transaction-amount">Valor (R$)</Label>
+                      <Input
+                        id="transaction-amount"
+                        type="number"
+                        step="0.01"
+                        value={newTransaction.amount}
+                        onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="transaction-payment">Método de Pagamento</Label>
+                      <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, paymentMethod: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o método" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {paymentMethods.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="transaction-description">Descrição</Label>
+                      <Textarea
+                        id="transaction-description"
+                        value={newTransaction.description}
+                        onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                        placeholder="Detalhes da transação"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={addManualTransaction}>Adicionar Transação</Button>
+                </div>
+
+                <div className="mt-8">
+                  <h3 className="text-xl font-bold mb-4">Relatório de Caixa</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                      <Label htmlFor="report-start-date">Data Inicial</Label>
+                      <Input
+                        id="report-start-date"
+                        type="date"
+                        value={reportFilters.startDate}
+                        onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="report-end-date">Data Final</Label>
+                      <Input
+                        id="report-end-date"
+                        type="date"
+                        value={reportFilters.endDate}
+                        onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="report-payment-method">Método de Pagamento</Label>
+                      <Select onValueChange={(value) => setReportFilters({ ...reportFilters, paymentMethod: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          {paymentMethods.map((method) => (
+                            <SelectItem key={method.value} value={method.value}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="report-transaction-type">Tipo de Transação</Label>
+                      <Select onValueChange={(value) => setReportFilters({ ...reportFilters, transactionType: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          {transactionTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <h4 className="text-lg font-semibold">Resumo do Período</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Total</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Entradas</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Saídas</CardTitle>
+                      </CardHeader>
+                      <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
+                    </Card>
+                  </div>
+
+                  <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
+                      <Card key={method}>
+                        <CardHeader>
+                          <CardTitle>{paymentMethods.find((m) => m.value === method)?.label || method}</CardTitle>
+                        </CardHeader>
+                        <CardContent>R$ {Number(amount).toFixed(2)}</CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <h4 className="text-lg font-semibold">Contagem de Transações</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Total de Transações</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.transactionCount}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Transações Automáticas</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.automaticCount}</CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Transações Manuais</CardTitle>
+                      </CardHeader>
+                      <CardContent>{filteredCashSummary.manualCount}</CardContent>
+                    </Card>
+                  </div>
+
+                  <h3 className="text-xl font-bold mt-8 mb-4">Histórico de Transações</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full leading-normal">
+                      <thead>
+                        <tr>
+                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Tipo
+                          </th>
+                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Valor
+                          </th>
+                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Método
+                          </th>
+                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Descrição
+                          </th>
+                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Data
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getFilteredTransactions().map((transaction) => (
+                          <tr key={transaction.id} className={transaction.isAutomatic ? "opacity-50" : ""}>
+                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                              <div className="flex items-center">
+                                <div className="ml-3">
+                                  <p
+                                    className={`text-gray-900 whitespace-no-wrap ${transactionTypes.find((t) => t.value === transaction.type)?.color}`}
+                                  >
+                                    {transactionTypes.find((t) => t.value === transaction.type)?.label}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                              <p className="text-gray-900 whitespace-no-wrap">
+                                R${" "}
+                                {(typeof transaction.amount === "string"
+                                  ? Number.parseFloat(transaction.amount)
+                                  : transaction.amount
+                                ).toFixed(2)}
+                              </p>
+                            </td>
+                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                              <p className="text-gray-900 whitespace-no-wrap">
+                                {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label ||
+                                  transaction.paymentMethod}
+                              </p>
+                            </td>
+                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                              <p className="text-gray-900 whitespace-no-wrap">{transaction.description}</p>
+                            </td>
+                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                              <p className="text-gray-900 whitespace-no-wrap">{transaction.date}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="mt-8">
+                  <h3 className="text-xl font-bold mb-4">Ajuste de Saldo</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="cash-new">Novo Saldo (R$)</Label>
+                      <Input
+                        id="cash-new"
+                        type="number"
+                        value={cashBalance.newBalance}
+                        onChange={(e) => setCashBalance({ ...cashBalance, newBalance: e.target.value })}
+                        placeholder="Saldo atualizado"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="cash-reason">Motivo</Label>
+                      <Textarea
+                        id="cash-reason"
+                        value={cashBalance.reason}
+                        onChange={(e) => setCashBalance({ ...cashBalance, reason: e.target.value })}
+                        placeholder="Motivo do ajuste"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (cashBalance.newBalance && cashBalance.reason) {
+                        balanceCash(Number(cashBalance.newBalance), cashBalance.reason)
+                        setCashBalance({ newBalance: "", reason: "" })
+                      }
+                    }}
+                    className="mt-4"
+                  >
+                    Ajustar Saldo
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Configurações */}
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle>Configurações Gerais</CardTitle>
+                <CardDescription>Ajuste as configurações do sistema</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Configurações do WhatsApp</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="whatsapp-phone">Número do WhatsApp</Label>
+                      <Input
+                        id="whatsapp-phone"
+                        type="tel"
+                        placeholder="Número com DDD"
+                        value={whatsappConfig.phone}
+                        onChange={(e) => setWhatsappConfig({ ...whatsappConfig, phone: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="whatsapp-message">Mensagem Padrão</Label>
+                      <Textarea
+                        id="whatsapp-message"
+                        placeholder="Mensagem enviada com o pedido"
+                        value={whatsappConfig.message}
+                        onChange={(e) => setWhatsappConfig({ ...whatsappConfig, message: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveWhatsappConfig}>Salvar Configurações do WhatsApp</Button>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Alterar Credenciais</h3>
+                  <Button onClick={() => setShowChangeCredentials(!showChangeCredentials)}>
+                    {showChangeCredentials ? "Cancelar" : "Alterar Credenciais"}
+                  </Button>
+
+                  {showChangeCredentials && (
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label htmlFor="new-username">Novo Usuário</Label>
+                        <Input
+                          id="new-username"
+                          type="text"
+                          placeholder="Novo usuário"
+                          value={newCredentials.username}
+                          onChange={(e) => setNewCredentials({ ...newCredentials, username: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-password">Nova Senha</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          placeholder="Nova senha"
+                          value={newCredentials.password}
+                          onChange={(e) => setNewCredentials({ ...newCredentials, password: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          placeholder="Confirme a nova senha"
+                          value={newCredentials.confirmPassword}
+                          onChange={(e) => setNewCredentials({ ...newCredentials, confirmPassword: e.target.value })}
+                        />
+                      </div>
+
+                      {credentialsError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-600">{credentialsError}</p>
+                        </div>
+                      )}
+
+                      <Button onClick={handleChangeCredentials}>Salvar Credenciais</Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
 }
 
 export default AdminPanel
