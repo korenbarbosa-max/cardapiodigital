@@ -168,3 +168,133 @@
     }
   }
 }
+
+/* Adicionando estilos para impressão de relatórios */
+@media print {
+  /* Ocultar elementos desnecessários na impressão */
+  .print\:hidden,
+  header,
+  nav,
+  button:not(.print-button),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Configurações gerais de impressão */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  /* Forçar quebras de página adequadas */
+  .print\:break-before {
+    page-break-before: always;
+  }
+
+  .print\:break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Estilizar cards e containers para impressão */
+  [class*="Card"],
+  [class*="card"] {
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
+  /* Melhorar tabelas na impressão */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  table thead {
+    display: table-header-group;
+  }
+
+  table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+  }
+
+  /* Garantir que badges e status apareçam na impressão */
+  [class*="Badge"],
+  [class*="badge"] {
+    border: 1px solid currentColor !important;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Melhorar títulos e cabeçalhos */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid;
+    font-weight: bold;
+  }
+
+  h1 {
+    font-size: 24pt;
+  }
+  h2 {
+    font-size: 20pt;
+  }
+  h3 {
+    font-size: 16pt;
+  }
+  h4 {
+    font-size: 14pt;
+  }
+
+  /* Adicionar data e hora de impressão */
+  .print\:show-date::after {
+    content: "Impresso em: " attr(data-print-date);
+    display: block;
+    text-align: right;
+    font-size: 10pt;
+    color: #6b7280;
+    margin-top: 1rem;
+  }
+
+  /* Remover backgrounds coloridos para economizar tinta */
+  * {
+    background-color: transparent !important;
+    color: black !important;
+  }
+
+  /* Manter cores específicas importantes */
+  .text-green-600,
+  .text-green-700 {
+    color: #059669 !important;
+  }
+
+  .text-red-600,
+  .text-red-700 {
+    color: #dc2626 !important;
+  }
+
+  .text-blue-600,
+  .text-blue-700 {
+    color: #2563eb !important;
+  }
+
+  /* Garantir bordas visíveis */
+  .border,
+  [class*="border-"] {
+    border-color: #e5e7eb !important;
+  }
+}

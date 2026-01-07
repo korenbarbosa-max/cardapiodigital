@@ -363,6 +363,10 @@ const AdminPanel = () => {
         setOrders(convertedOrders)
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        // Silently ignore abort errors
+        return
+      }
       console.error("Erro ao carregar pedidos:", error)
     }
   }
@@ -534,7 +538,7 @@ const AdminPanel = () => {
 
     const interval = setInterval(() => {
       loadOrders() // Poll orders
-    }, 5000)
+    }, 10000) // A cada 10 segundos
 
     return () => clearInterval(interval)
   }, [])
@@ -1502,6 +1506,10 @@ Confirma o fechamento?
       }
     })
     return summary
+  }
+
+  const printReport = () => {
+    window.print()
   }
 
   if (loading && isAuthenticated) {
@@ -2895,28 +2903,6 @@ Confirma o fechamento?
 
                     <h4 className="text-lg font-semibold">Resumo do Período</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Total</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Entradas</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Saídas</CardTitle>
-                        </CardHeader>
-                        <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
-                      </Card>
-                    </div>
-
-                    <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
                         <Card key={method}>
                           <CardHeader>
@@ -3056,6 +3042,14 @@ Confirma o fechamento?
           {/* Relatórios Tab Content */}
           <TabsContent value="reports">
             <div className="space-y-6">
+              <div className="flex justify-between items-center print:hidden">
+                <h2 className="text-2xl font-bold">Relatórios</h2>
+                <Button onClick={printReport} variant="outline">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir Relatório
+                </Button>
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle>Relatório de Vendas</CardTitle>
