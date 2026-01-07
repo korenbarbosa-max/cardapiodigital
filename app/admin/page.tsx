@@ -292,6 +292,24 @@ const AdminPanel = () => {
     reason: "",
   })
 
+  // Adicionando estados para sessão de caixa
+  const [cashSession, setCashSession] = useState<{
+    isOpen: boolean
+    openingBalance: number
+    openingTime: string
+    openingUser: string
+  } | null>(null)
+
+  const [cashOpening, setCashOpening] = useState({
+    initialBalance: "",
+    observation: "",
+  })
+
+  const [cashClosing, setCashClosing] = useState({
+    declaredBalance: "",
+    observation: "",
+  })
+
   const [loading, setLoading] = useState(true)
 
   const loadProducts = async () => {
@@ -507,6 +525,13 @@ const AdminPanel = () => {
     loadCashTransactions() // Ensure cash transactions are loaded
     loadExtras()
 
+    if (typeof window !== "undefined") {
+      const savedSession = localStorage.getItem("cashSession")
+      if (savedSession) {
+        setCashSession(JSON.parse(savedSession))
+      }
+    }
+
     const interval = setInterval(() => {
       loadOrders() // Poll orders
     }, 5000)
@@ -548,6 +573,7 @@ const AdminPanel = () => {
   const handleLogout = () => {
     setIsAuthenticated(false)
     localStorage.removeItem("admin_authenticated")
+    localStorage.removeItem("cashSession") // Limpar sessão de caixa ao deslogar
     setActiveTab("dashboard")
     window.location.href = "/"
   }
@@ -1176,6 +1202,106 @@ const AdminPanel = () => {
     }
   }
 
+  const openCashRegister = async () => {
+    if (!cashOpening.initialBalance) {
+      alert("Informe o valor inicial do caixa (sangria)")
+      return
+    }
+
+    const openingBalance = Number.parseFloat(cashOpening.initialBalance)
+
+    // Registrar transação de abertura
+    try {
+      const response = await fetch("/api/cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "balance",
+          amount: openingBalance,
+          description: `Abertura de caixa - ${cashOpening.observation || "Sem observação"}`,
+          paymentMethod: "dinheiro",
+        }),
+      })
+
+      if (response.ok) {
+        const session = {
+          isOpen: true,
+          openingBalance,
+          openingTime: new Date().toLocaleString("pt-BR"),
+          openingUser: credentials.username,
+        }
+
+        setCashSession(session)
+        localStorage.setItem("cashSession", JSON.stringify(session))
+        setCashOpening({ initialBalance: "", observation: "" })
+
+        await loadCashTransactions()
+        alert("Caixa aberto com sucesso!")
+      }
+    } catch (error) {
+      console.error("Erro ao abrir caixa:", error)
+      alert("Erro ao abrir caixa. Tente novamente.")
+    }
+  }
+
+  const closeCashRegister = async () => {
+    if (!cashSession) {
+      alert("Nenhum caixa aberto")
+      return
+    }
+
+    if (!cashClosing.declaredBalance) {
+      alert("Informe o valor contado no fechamento")
+      return
+    }
+
+    const declaredBalance = Number.parseFloat(cashClosing.declaredBalance)
+    const expectedBalance = getCashSummary().total // Usando getCashSummary para obter o saldo atual
+
+    const difference = declaredBalance - expectedBalance
+
+    const confirmMessage = `
+Fechamento de Caixa:
+- Valor esperado: R$ ${expectedBalance.toFixed(2)}
+- Valor contado: R$ ${declaredBalance.toFixed(2)}
+- Diferença: R$ ${difference.toFixed(2)}
+
+${cashClosing.observation ? `Observação: ${cashClosing.observation}` : ""}
+
+Confirma o fechamento?
+    `
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      // Registrar transação de fechamento
+      const response = await fetch("/api/cash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "balance",
+          amount: declaredBalance,
+          description: `Fechamento de caixa - Diferença: R$ ${difference.toFixed(2)} - ${cashClosing.observation || "Sem observação"}`,
+          paymentMethod: "dinheiro",
+        }),
+      })
+
+      if (response.ok) {
+        setCashSession(null)
+        localStorage.removeItem("cashSession")
+        setCashClosing({ declaredBalance: "", observation: "" })
+
+        await loadCashTransactions()
+        alert("Caixa fechado com sucesso!")
+      }
+    } catch (error) {
+      console.error("Erro ao fechar caixa:", error)
+      alert("Erro ao fechar caixa. Tente novamente.")
+    }
+  }
+
   const balanceCash = async (newBalance: number, reason: string) => {
     const currentBalance = cashTransactions.reduce((total, transaction) => {
       return transaction.type === "entrada" ? total + transaction.amount : total - transaction.amount
@@ -1307,33 +1433,35 @@ const AdminPanel = () => {
 
   const addExtra = () => {
     if (extraForm.name && extraForm.price) {
-      setExtras((prev) => [
-        ...prev,
-        { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
-      ])
+      const newExtra = {
+        id: Date.now().toString(),
+        name: extraForm.name,
+        price: Number.parseFloat(extraForm.price),
+      }
+
+      const updatedExtras = [...extras, newExtra]
+      setExtras(updatedExtras)
       setExtraForm({ name: "", price: "" })
-      localStorage.setItem(
-        "extras",
-        JSON.stringify([
-          ...extras,
-          { id: Date.now().toString(), name: extraForm.name, price: Number.parseFloat(extraForm.price) },
-        ]),
-      )
+
+      // Salvar no localStorage imediatamente
+      localStorage.setItem("extras", JSON.stringify(updatedExtras))
     }
   }
 
   const saveEditExtra = () => {
     if (editingExtra && extraForm.name && extraForm.price) {
-      setExtras((prev) =>
-        prev.map((extra) =>
-          extra.id === editingExtra
-            ? { ...extra, name: extraForm.name, price: Number.parseFloat(extraForm.price) }
-            : extra,
-        ),
+      const updatedExtras = extras.map((extra) =>
+        extra.id === editingExtra
+          ? { ...extra, name: extraForm.name, price: Number.parseFloat(extraForm.price) }
+          : extra,
       )
+
+      setExtras(updatedExtras)
       setEditingExtra(null)
       setExtraForm({ name: "", price: "" })
-      localStorage.setItem("extras", JSON.stringify(extras))
+
+      // Salvar no localStorage imediatamente
+      localStorage.setItem("extras", JSON.stringify(updatedExtras))
     }
   }
 
@@ -1349,9 +1477,31 @@ const AdminPanel = () => {
 
   const deleteExtra = (extraId: string) => {
     if (confirm("Tem certeza que deseja excluir este acréscimo?")) {
-      setExtras((prev) => prev.filter((extra) => extra.id !== extraId))
-      localStorage.setItem("extras", JSON.stringify(extras.filter((extra) => extra.id !== extraId)))
+      const updatedExtras = extras.filter((extra) => extra.id !== extraId)
+      setExtras(updatedExtras)
+
+      // Salvar no localStorage imediatamente
+      localStorage.setItem("extras", JSON.stringify(updatedExtras))
     }
+  }
+
+  const calculateCashSummary = () => {
+    const summary = {
+      total: 0,
+      entradas: 0,
+      saidas: 0,
+    }
+    cashTransactions.forEach((transaction) => {
+      const amount = Number.parseFloat(transaction.amount)
+      if (transaction.type === "entrada") {
+        summary.entradas += amount
+        summary.total += amount
+      } else {
+        summary.saidas += amount
+        summary.total -= amount
+      }
+    })
+    return summary
   }
 
   if (loading && isAuthenticated) {
@@ -2525,237 +2675,342 @@ const AdminPanel = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Gerenciar Caixa</CardTitle>
-                <CardDescription>Registre transações, visualize o histórico e ajuste o saldo</CardDescription>
+                <CardDescription>Abra/feche caixa, registre transações e visualize o histórico</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="transaction-type">Tipo de Transação</Label>
-                      <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {transactionTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="transaction-amount">Valor (R$)</Label>
-                      <Input
-                        id="transaction-amount"
-                        type="number"
-                        step="0.01"
-                        value={newTransaction.amount}
-                        onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="transaction-payment">Método de Pagamento</Label>
-                      <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, paymentMethod: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o método" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="transaction-description">Descrição</Label>
-                      <Textarea
-                        id="transaction-description"
-                        value={newTransaction.description}
-                        onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
-                        placeholder="Detalhes da transação"
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={addManualTransaction}>Adicionar Transação</Button>
-                </div>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                    {!cashSession?.isOpen ? (
+                      // Formulário de Abertura
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Lock className="w-5 h-5" />
+                          Abrir Caixa
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="opening-balance">Valor Inicial (Sangria) *</Label>
+                            <Input
+                              id="opening-balance"
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={cashOpening.initialBalance}
+                              onChange={(e) => setCashOpening({ ...cashOpening, initialBalance: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="opening-observation">Observação</Label>
+                            <Input
+                              id="opening-observation"
+                              placeholder="Ex: Operador João Silva"
+                              value={cashOpening.observation}
+                              onChange={(e) => setCashOpening({ ...cashOpening, observation: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <Button onClick={openCashRegister} className="w-full">
+                          <Lock className="w-4 h-4 mr-2" />
+                          Abrir Caixa
+                        </Button>
+                      </div>
+                    ) : (
+                      // Informações do Caixa Aberto e Fechamento
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <Check className="w-5 h-5 text-green-600" />
+                            Caixa Aberto
+                          </h3>
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            Em operação
+                          </Badge>
+                        </div>
 
-                <div className="mt-8">
-                  <h3 className="text-xl font-bold mb-4">Relatório de Caixa</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div>
-                      <Label htmlFor="report-start-date">Data Inicial</Label>
-                      <Input
-                        id="report-start-date"
-                        type="date"
-                        value={reportFilters.startDate}
-                        onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="report-end-date">Data Final</Label>
-                      <Input
-                        id="report-end-date"
-                        type="date"
-                        value={reportFilters.endDate}
-                        onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="report-payment-method">Método de Pagamento</Label>
-                      <Select onValueChange={(value) => setReportFilters({ ...reportFilters, paymentMethod: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="report-transaction-type">Tipo de Transação</Label>
-                      <Select onValueChange={(value) => setReportFilters({ ...reportFilters, transactionType: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          {transactionTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div className="bg-background p-3 rounded">
+                            <p className="text-muted-foreground">Abertura</p>
+                            <p className="font-semibold">{cashSession.openingTime}</p>
+                          </div>
+                          <div className="bg-background p-3 rounded">
+                            <p className="text-muted-foreground">Operador</p>
+                            <p className="font-semibold">{cashSession.openingUser}</p>
+                          </div>
+                          <div className="bg-background p-3 rounded">
+                            <p className="text-muted-foreground">Valor Inicial</p>
+                            <p className="font-semibold">R$ {cashSession.openingBalance.toFixed(2)}</p>
+                          </div>
+                        </div>
+
+                        {/* Formulário de Fechamento */}
+                        <div className="border-t pt-4 mt-4 space-y-4">
+                          <h4 className="font-semibold">Fechar Caixa</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="closing-balance">Valor Contado *</Label>
+                              <Input
+                                id="closing-balance"
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={cashClosing.declaredBalance}
+                                onChange={(e) => setCashClosing({ ...cashClosing, declaredBalance: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="closing-observation">Observação</Label>
+                              <Input
+                                id="closing-observation"
+                                placeholder="Observações do fechamento"
+                                value={cashClosing.observation}
+                                onChange={(e) => setCashClosing({ ...cashClosing, observation: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          <Button onClick={closeCashRegister} variant="destructive" className="w-full">
+                            <X className="w-4 h-4 mr-2" />
+                            Fechar Caixa
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <h4 className="text-lg font-semibold">Resumo do Período</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Total</CardTitle>
-                      </CardHeader>
-                      <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Entradas</CardTitle>
-                      </CardHeader>
-                      <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Saídas</CardTitle>
-                      </CardHeader>
-                      <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
-                    </Card>
+                  {/* Adicionar Transação Manual */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Registrar Transação Manual</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="transaction-type">Tipo de Transação</Label>
+                        <Select onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {transactionTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="transaction-amount">Valor (R$)</Label>
+                        <Input
+                          id="transaction-amount"
+                          type="number"
+                          step="0.01"
+                          value={newTransaction.amount}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="transaction-payment">Método de Pagamento</Label>
+                        <Select
+                          onValueChange={(value) => setNewTransaction({ ...newTransaction, paymentMethod: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o método" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentMethods.map((method) => (
+                              <SelectItem key={method.value} value={method.value}>
+                                {method.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label htmlFor="transaction-description">Descrição</Label>
+                        <Textarea
+                          id="transaction-description"
+                          value={newTransaction.description}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                          placeholder="Detalhes da transação"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={addManualTransaction}>Adicionar Transação</Button>
                   </div>
 
-                  <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
-                      <Card key={method}>
+                  <div className="mt-8">
+                    <h3 className="text-xl font-bold mb-4">Relatório de Caixa</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div>
+                        <Label htmlFor="report-start-date">Data Inicial</Label>
+                        <Input
+                          id="report-start-date"
+                          type="date"
+                          value={reportFilters.startDate}
+                          onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="report-end-date">Data Final</Label>
+                        <Input
+                          id="report-end-date"
+                          type="date"
+                          value={reportFilters.endDate}
+                          onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="report-payment-method">Método de Pagamento</Label>
+                        <Select onValueChange={(value) => setReportFilters({ ...reportFilters, paymentMethod: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            {paymentMethods.map((method) => (
+                              <SelectItem key={method.value} value={method.value}>
+                                {method.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="report-transaction-type">Tipo de Transação</Label>
+                        <Select
+                          onValueChange={(value) => setReportFilters({ ...reportFilters, transactionType: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            {transactionTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <h4 className="text-lg font-semibold">Resumo do Período</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
                         <CardHeader>
-                          <CardTitle>{paymentMethods.find((m) => m.value === method)?.label || method}</CardTitle>
+                          <CardTitle>Total</CardTitle>
                         </CardHeader>
-                        <CardContent>R$ {Number(amount).toFixed(2)}</CardContent>
+                        <CardContent>R$ {filteredCashSummary.total.toFixed(2)}</CardContent>
                       </Card>
-                    ))}
-                  </div>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Entradas</CardTitle>
+                        </CardHeader>
+                        <CardContent>R$ {filteredCashSummary.entradas.toFixed(2)}</CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Saídas</CardTitle>
+                        </CardHeader>
+                        <CardContent>R$ {filteredCashSummary.saidas.toFixed(2)}</CardContent>
+                      </Card>
+                    </div>
 
-                  <h4 className="text-lg font-semibold">Contagem de Transações</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Total de Transações</CardTitle>
-                      </CardHeader>
-                      <CardContent>{filteredCashSummary.transactionCount}</CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Transações Automáticas</CardTitle>
-                      </CardHeader>
-                      <CardContent>{filteredCashSummary.automaticCount}</CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Transações Manuais</CardTitle>
-                      </CardHeader>
-                      <CardContent>{filteredCashSummary.manualCount}</CardContent>
-                    </Card>
-                  </div>
+                    <h4 className="text-lg font-semibold">Detalhes por Método de Pagamento</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {Object.entries(filteredCashSummary.byPaymentMethod).map(([method, amount]) => (
+                        <Card key={method}>
+                          <CardHeader>
+                            <CardTitle>{paymentMethods.find((m) => m.value === method)?.label || method}</CardTitle>
+                          </CardHeader>
+                          <CardContent>R$ {Number(amount).toFixed(2)}</CardContent>
+                        </Card>
+                      ))}
+                    </div>
 
-                  <h3 className="text-xl font-bold mt-8 mb-4">Histórico de Transações</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full leading-normal">
-                      <thead>
-                        <tr>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Tipo
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Valor
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Método
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Descrição
-                          </th>
-                          <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Data
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {getFilteredTransactions().map((transaction) => (
-                          <tr key={transaction.id} className={transaction.isAutomatic ? "opacity-50" : ""}>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <div className="flex items-center">
-                                <div className="ml-3">
-                                  <p
-                                    className={`text-gray-900 whitespace-no-wrap ${transactionTypes.find((t) => t.value === transaction.type)?.color}`}
-                                  >
-                                    {transactionTypes.find((t) => t.value === transaction.type)?.label}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <p className="text-gray-900 whitespace-no-wrap">
-                                R${" "}
-                                {(typeof transaction.amount === "string"
-                                  ? Number.parseFloat(transaction.amount)
-                                  : transaction.amount
-                                ).toFixed(2)}
-                              </p>
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <p className="text-gray-900 whitespace-no-wrap">
-                                {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label ||
-                                  transaction.paymentMethod}
-                              </p>
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <p className="text-gray-900 whitespace-no-wrap">{transaction.description}</p>
-                            </td>
-                            <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                              <p className="text-gray-900 whitespace-no-wrap">{transaction.date}</p>
-                            </td>
+                    <h4 className="text-lg font-semibold">Contagem de Transações</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Total de Transações</CardTitle>
+                        </CardHeader>
+                        <CardContent>{filteredCashSummary.transactionCount}</CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Transações Automáticas</CardTitle>
+                        </CardHeader>
+                        <CardContent>{filteredCashSummary.automaticCount}</CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Transações Manuais</CardTitle>
+                        </CardHeader>
+                        <CardContent>{filteredCashSummary.manualCount}</CardContent>
+                      </Card>
+                    </div>
+
+                    <h3 className="text-xl font-bold mt-8 mb-4">Histórico de Transações</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full leading-normal">
+                        <thead>
+                          <tr>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Tipo
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Valor
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Método
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Descrição
+                            </th>
+                            <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                              Data
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {getFilteredTransactions().map((transaction) => (
+                            <tr key={transaction.id} className={transaction.isAutomatic ? "opacity-50" : ""}>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <div className="flex items-center">
+                                  <div className="ml-3">
+                                    <p
+                                      className={`text-gray-900 whitespace-no-wrap ${transactionTypes.find((t) => t.value === transaction.type)?.color}`}
+                                    >
+                                      {transactionTypes.find((t) => t.value === transaction.type)?.label}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p className="text-gray-900 whitespace-no-wrap">
+                                  R${" "}
+                                  {(typeof transaction.amount === "string"
+                                    ? Number.parseFloat(transaction.amount)
+                                    : transaction.amount
+                                  ).toFixed(2)}
+                                </p>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p className="text-gray-900 whitespace-no-wrap">
+                                  {paymentMethods.find((m) => m.value === transaction.paymentMethod)?.label ||
+                                    transaction.paymentMethod}
+                                </p>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p className="text-gray-900 whitespace-no-wrap">{transaction.description}</p>
+                              </td>
+                              <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                                <p className="text-gray-900 whitespace-no-wrap">{transaction.date}</p>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
