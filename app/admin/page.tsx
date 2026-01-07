@@ -36,6 +36,7 @@ import {
   Tag,
   Save,
   Trash,
+  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -378,7 +379,6 @@ const AdminPanel = () => {
     }
     */
   }
-  // </CHANGE>
 
   const addExtraGlobal = async () => {
     if (!newExtraGlobal.name || !newExtraGlobal.price) {
@@ -677,6 +677,17 @@ const AdminPanel = () => {
     }
   }
 
+  // Nova função para adicionar acréscimo da lista global
+  const addGlobalExtraToNewProduct = (extraId: string) => {
+    const extra = extras.find((e) => e.id === extraId)
+    if (extra && !newProduct.extras.find((e) => e.name === extra.name)) {
+      setNewProduct((prev) => ({
+        ...prev,
+        extras: [...prev.extras, { name: extra.name, price: extra.price }],
+      }))
+    }
+  }
+
   const removeExtraFromNewProduct = (index: number) => {
     setNewProduct((prev) => ({
       ...prev,
@@ -691,6 +702,17 @@ const AdminPanel = () => {
         extras: [...prev.extras, { name: editExtra.name, price: Number.parseFloat(editExtra.price) }],
       }))
       setEditExtra({ name: "", price: "" })
+    }
+  }
+
+  // Nova função para adicionar acréscimo da lista global ao produto em edição
+  const addGlobalExtraToEditProduct = (extraId: string) => {
+    const extra = extras.find((e) => e.id === extraId)
+    if (extra && !editForm.extras.find((e) => e.name === extra.name)) {
+      setEditForm((prev) => ({
+        ...prev,
+        extras: [...prev.extras, { name: extra.name, price: extra.price }],
+      }))
     }
   }
 
@@ -1488,6 +1510,14 @@ const AdminPanel = () => {
               Caixa
             </TabsTrigger>
             <TabsTrigger
+              value="reports"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <FileText className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Relatórios</span>
+              <span className="sm:hidden">Rel.</span>
+            </TabsTrigger>
+            <TabsTrigger
               value="settings"
               className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
             >
@@ -1798,50 +1828,94 @@ const AdminPanel = () => {
                       />
                       <Label htmlFor="visible-menu">Visível no cardápio</Label>
                     </div>
+                    {/* Seção de Acréscimos no formulário de NOVO produto */}
                     <div className="space-y-2">
-                      <Label>Acréscimos Disponíveis</Label>
-                      <div className="border rounded-lg p-4 space-y-3">
-                        <div className="flex gap-2">
+                      <Label className="text-sm sm:text-base">Acréscimos Disponíveis</Label>
+
+                      {extras.length > 0 && (
+                        <div className="space-y-2">
+                          <Select onValueChange={addGlobalExtraToNewProduct}>
+                            <SelectTrigger className="text-sm sm:text-base">
+                              <SelectValue placeholder="Selecionar acréscimo cadastrado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {extras.map((extra) => (
+                                <SelectItem key={extra.id} value={extra.id} className="text-sm sm:text-base">
+                                  {extra.name} - R$ {extra.price.toFixed(2)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">Ou adicione um acréscimo personalizado abaixo</p>
+                        </div>
+                      )}
+
+                      {/* Formulário manual para acréscimos personalizados */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
+                        <div>
+                          <Label htmlFor="new-extra-name" className="text-xs sm:text-sm">
+                            Nome (personalizado)
+                          </Label>
                           <Input
-                            placeholder="Nome do acréscimo (ex: Bacon)"
+                            id="new-extra-name"
+                            placeholder="Ex: Bacon Extra"
                             value={newExtra.name}
                             onChange={(e) => setNewExtra({ ...newExtra, name: e.target.value })}
-                            className="flex-1"
+                            className="text-sm sm:text-base"
                           />
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Preço"
-                            value={newExtra.price}
-                            onChange={(e) => setNewExtra({ ...newExtra, price: e.target.value })}
-                            className="w-24"
-                          />
-                          <Button type="button" onClick={addExtraToNewProduct} size="sm">
-                            <Plus className="w-4 h-4" />
-                          </Button>
                         </div>
-
-                        {newProduct.extras.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Acréscimos adicionados:</p>
-                            {newProduct.extras.map((extra, index) => (
-                              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                <span className="text-sm">
-                                  {extra.name} - R$ {extra.price.toFixed(2)}
-                                </span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeExtraFromNewProduct(index)}
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Label htmlFor="new-extra-price" className="text-xs sm:text-sm">
+                              Preço (R$)
+                            </Label>
+                            <Input
+                              id="new-extra-price"
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={newExtra.price}
+                              onChange={(e) => setNewExtra({ ...newExtra, price: e.target.value })}
+                              className="text-sm sm:text-base"
+                            />
                           </div>
-                        )}
+                          <div className="flex items-end">
+                            <Button
+                              type="button"
+                              onClick={addExtraToNewProduct}
+                              size="sm"
+                              className="text-xs sm:text-sm"
+                            >
+                              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Lista de acréscimos adicionados */}
+                      {newProduct.extras.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {newProduct.extras.map((extra, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-2 bg-muted rounded text-xs sm:text-sm"
+                            >
+                              <span>
+                                {extra.name} - R$ {extra.price.toFixed(2)}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeExtraFromNewProduct(index)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <Button onClick={addNewProduct} className="mt-4">
@@ -1931,53 +2005,96 @@ const AdminPanel = () => {
                               />
                               <Label htmlFor={`visible-menu-${product.id}`}>Visível no cardápio</Label>
                             </div>
+                            {/* Seção de Acréscimos no formulário de EDIÇÃO de produto */}
                             <div className="space-y-2">
-                              <Label>Acréscimos Disponíveis</Label>
-                              <div className="border rounded-lg p-4 space-y-3">
-                                <div className="flex gap-2">
+                              <Label className="text-sm sm:text-base">Acréscimos Disponíveis</Label>
+
+                              {extras.length > 0 && (
+                                <div className="space-y-2">
+                                  <Select onValueChange={addGlobalExtraToEditProduct}>
+                                    <SelectTrigger className="text-sm sm:text-base">
+                                      <SelectValue placeholder="Selecionar acréscimo cadastrado" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {extras.map((extra) => (
+                                        <SelectItem key={extra.id} value={extra.id} className="text-sm sm:text-base">
+                                          {extra.name} - R$ {extra.price.toFixed(2)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground">
+                                    Ou adicione um acréscimo personalizado abaixo
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Formulário manual para acréscimos personalizados */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
+                                <div>
+                                  <Label htmlFor="edit-extra-name" className="text-xs sm:text-sm">
+                                    Nome (personalizado)
+                                  </Label>
                                   <Input
-                                    placeholder="Nome do acréscimo (ex: Bacon)"
+                                    id="edit-extra-name"
+                                    placeholder="Ex: Bacon Extra"
                                     value={editExtra.name}
                                     onChange={(e) => setEditExtra({ ...editExtra, name: e.target.value })}
-                                    className="flex-1"
+                                    className="text-sm sm:text-base"
                                   />
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Preço"
-                                    value={editExtra.price}
-                                    onChange={(e) => setEditExtra({ ...editExtra, price: e.target.value })}
-                                    className="w-24"
-                                  />
-                                  <Button type="button" onClick={addExtraToEditProduct} size="sm">
-                                    <Plus className="w-4 h-4" />
-                                  </Button>
                                 </div>
-
-                                {editForm.extras.length > 0 && (
-                                  <div className="space-y-2">
-                                    <p className="text-sm font-medium">Acréscimos adicionados:</p>
-                                    {editForm.extras.map((extra, index) => (
-                                      <div
-                                        key={index}
-                                        className="flex items-center justify-between bg-gray-50 p-2 rounded"
-                                      >
-                                        <span className="text-sm">
-                                          {extra.name} - R$ {extra.price.toFixed(2)}
-                                        </span>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => removeExtraFromEditProduct(index)}
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    ))}
+                                <div className="flex gap-2">
+                                  <div className="flex-1">
+                                    <Label htmlFor="edit-extra-price" className="text-xs sm:text-sm">
+                                      Preço (R$)
+                                    </Label>
+                                    <Input
+                                      id="edit-extra-price"
+                                      type="number"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      value={editExtra.price}
+                                      onChange={(e) => setEditExtra({ ...editExtra, price: e.target.value })}
+                                      className="text-sm sm:text-base"
+                                    />
                                   </div>
-                                )}
+                                  <div className="flex items-end">
+                                    <Button
+                                      type="button"
+                                      onClick={addExtraToEditProduct}
+                                      size="sm"
+                                      className="text-xs sm:text-sm"
+                                    >
+                                      <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
+
+                              {/* Lista de acréscimos adicionados ao produto em edição */}
+                              {editForm.extras.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {editForm.extras.map((extra, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-center justify-between p-2 bg-muted rounded text-xs sm:text-sm"
+                                    >
+                                      <span>
+                                        {extra.name} - R$ {extra.price.toFixed(2)}
+                                      </span>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeExtraFromEditProduct(index)}
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <div className="md:col-span-3 flex space-x-2">
                               <Button onClick={saveEditProduct} size="sm">
@@ -2681,7 +2798,225 @@ const AdminPanel = () => {
             </Card>
           </TabsContent>
 
-          {/* Configurações */}
+          {/* Relatórios Tab Content */}
+          <TabsContent value="reports">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Relatório de Vendas</CardTitle>
+                  <CardDescription>Análise detalhada das vendas e faturamento</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Total de Pedidos</span>
+                        <ShoppingBag className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="text-2xl font-bold">{orders.length}</div>
+                      <p className="text-xs text-gray-500">
+                        {orders.filter((o) => o.status === "pendente").length} pendentes
+                      </p>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Faturamento Total</span>
+                        <DollarSign className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="text-2xl font-bold">
+                        R$ {orders.reduce((acc, order) => acc + order.total, 0).toFixed(2)}
+                      </div>
+                      <p className="text-xs text-gray-500">Todos os pedidos</p>
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Ticket Médio</span>
+                        <Receipt className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="text-2xl font-bold">
+                        R${" "}
+                        {orders.length > 0
+                          ? (orders.reduce((acc, order) => acc + order.total, 0) / orders.length).toFixed(2)
+                          : "0.00"}
+                      </div>
+                      <p className="text-xs text-gray-500">Por pedido</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Produtos Mais Vendidos</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-4">Produto</th>
+                            <th className="text-center py-2 px-4">Quantidade</th>
+                            <th className="text-right py-2 px-4">Faturamento</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {productSalesData.slice(0, 10).map((product) => (
+                            <tr key={product.fullName} className="border-b">
+                              <td className="py-2 px-4">{product.fullName}</td>
+                              <td className="text-center py-2 px-4">{product.quantity}</td>
+                              <td className="text-right py-2 px-4">
+                                R${" "}
+                                {(
+                                  product.quantity * (products.find((p) => p.name === product.fullName)?.price || 0)
+                                ).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Relatório de Caixa</CardTitle>
+                  <CardDescription>Resumo das movimentações financeiras</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 border rounded-lg bg-green-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-green-700">Total Entradas</span>
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-green-700">
+                        R${" "}
+                        {cashTransactions
+                          .filter((t) => t.type === "entrada")
+                          .reduce((acc, t) => acc + t.amount, 0)
+                          .toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg bg-red-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-red-700">Total Saídas</span>
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-red-700">
+                        R${" "}
+                        {cashTransactions
+                          .filter((t) => t.type === "saida")
+                          .reduce((acc, t) => acc + t.amount, 0)
+                          .toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-lg bg-blue-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-blue-700">Saldo</span>
+                        <DollarSign className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-blue-700">
+                        R${" "}
+                        {(
+                          cashTransactions.filter((t) => t.type === "entrada").reduce((acc, t) => acc + t.amount, 0) -
+                          cashTransactions.filter((t) => t.type === "saida").reduce((acc, t) => acc + t.amount, 0)
+                        ).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Últimas Transações</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-4">Data/Hora</th>
+                            <th className="text-left py-2 px-4">Tipo</th>
+                            <th className="text-left py-2 px-4">Descrição</th>
+                            <th className="text-right py-2 px-4">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cashTransactions.slice(0, 10).map((transaction) => (
+                            <tr key={transaction.id} className={transaction.isAutomatic ? "opacity-50" : ""}>
+                              <td className="py-2 px-4 text-sm">{transaction.timestamp}</td>
+                              <td className="py-2 px-4">
+                                <Badge variant={transaction.type === "entrada" ? "default" : "destructive"}>
+                                  {transaction.type}
+                                </Badge>
+                              </td>
+                              <td className="py-2 px-4 text-sm">{transaction.description}</td>
+                              <td
+                                className={`py-2 px-4 text-right font-semibold ${
+                                  transaction.type === "entrada" ? "text-green-600" : "text-red-600"
+                                }`}
+                              >
+                                {transaction.type === "entrada" ? "+" : "-"} R$ {transaction.amount.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Relatório de Estoque</CardTitle>
+                  <CardDescription>Status atual do inventário</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-4">Produto</th>
+                            <th className="text-center py-2 px-4">Controle</th>
+                            <th className="text-center py-2 px-4">Quantidade</th>
+                            <th className="text-center py-2 px-4">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map((product) => (
+                            <tr key={product.id} className="border-b">
+                              <td className="py-2 px-4">{product.name}</td>
+                              <td className="text-center py-2 px-4">
+                                {product.stockControl ? (
+                                  <Badge variant="outline">Ativo</Badge>
+                                ) : (
+                                  <Badge variant="secondary">Inativo</Badge>
+                                )}
+                              </td>
+                              <td className="text-center py-2 px-4">
+                                {product.stockControl ? product.stockQuantity : "-"}
+                              </td>
+                              <td className="text-center py-2 px-4">
+                                {product.stockControl && (
+                                  <>
+                                    {product.stockQuantity === 0 && <Badge variant="destructive">Sem estoque</Badge>}
+                                    {product.stockQuantity > 0 && product.stockQuantity <= 10 && (
+                                      <Badge className="bg-yellow-500">Baixo</Badge>
+                                    )}
+                                    {product.stockQuantity > 10 && <Badge className="bg-green-500">OK</Badge>}
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="settings">
             <Card>
               <CardHeader>
