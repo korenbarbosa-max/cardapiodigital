@@ -12,31 +12,36 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  BarChart3,
+  ShoppingBag,
+  Package,
+  DollarSign,
   Settings,
   Plus,
   Edit,
   Trash2,
-  DollarSign,
-  ShoppingBag,
-  Printer,
-  Home,
-  Receipt,
+  Check,
   X,
+  Printer,
+  LogOut,
+  Home,
+  Lock,
+  ArrowLeft,
+  FileText,
+  User,
+  Phone,
+  MapPin,
   CreditCard,
+  Eye,
+  EyeOff,
+  Tag,
   Banknote,
   Smartphone,
   TrendingUp,
   TrendingDown,
-  Lock,
-  LogOut,
-  ArrowLeft,
-  Check,
-  BarChart3,
-  Package,
-  Tag,
+  Receipt,
   Save,
   Trash,
-  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -241,7 +246,6 @@ const AdminPanel = () => {
     extras: [] as { name: string; price: number }[],
   })
 
-  const [newExtra, setNewExtra] = useState({ name: "", price: "" }) // Acréscimo para um produto específico
   const [editExtra, setEditExtra] = useState({ name: "", price: "" }) // Acréscimo para edição de um produto específico
   const [editingProduct, setEditingProduct] = useState<number | null>(null)
 
@@ -276,7 +280,7 @@ const AdminPanel = () => {
   const [whatsappConfig, setWhatsappConfig] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("whatsappConfig")
-      return saved ? JSON.JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
+      return saved ? JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
     }
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
@@ -356,6 +360,10 @@ const AdminPanel = () => {
             customer: {
               name: order.customer_name || "",
               phone: order.customer_phone || "",
+              address: order.customer_address || "",
+              paymentMethod: order.payment_method || "",
+              notes: order.notes || "",
+              // </CHANGE>
             },
           }
         })
@@ -697,6 +705,8 @@ const AdminPanel = () => {
     })
   }
 
+  const [newExtra, setNewExtra] = useState({ name: "", price: "" }) // Estado para o formulário de acréscimos no produto
+
   const addExtraToNewProduct = () => {
     if (newExtra.name && newExtra.price) {
       setNewProduct((prev) => ({
@@ -866,6 +876,23 @@ const AdminPanel = () => {
       }
     }
   }
+
+  const toggleProductVisibility = async (productId: number, currentVisibility: boolean) => {
+    try {
+      const response = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: productId, visible: !currentVisibility }),
+      })
+
+      if (response.ok) {
+        setProducts(products.map((p) => (p.id === productId ? { ...p, visible: !currentVisibility } : p)))
+      }
+    } catch (error) {
+      console.error("Erro ao alterar visibilidade:", error)
+    }
+  }
+  // </CHANGE>
 
   const enableStockControl = async (productId: number) => {
     try {
@@ -1485,7 +1512,7 @@ Confirma o fechamento?
       setExtras(updatedExtras)
 
       // Salvar no localStorage imediatamente
-      localStorage.setItem("extras", JSON.stringify(updatedExtras))
+      localStorage.setItem("extras", JSON.JSON.stringify(updatedExtras))
     }
   }
 
@@ -1847,6 +1874,43 @@ Confirma o fechamento?
                         </div>
                       </CardHeader>
                       <CardContent>
+                        <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="w-4 h-4 text-gray-500" />
+                            <span className="font-medium">Cliente:</span>
+                            <span>{order.customer?.name || "Não informado"}</span>
+                          </div>
+                          {order.customer?.phone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium">Telefone:</span>
+                              <span>{order.customer.phone}</span>
+                            </div>
+                          )}
+                          {order.customer?.address && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium">Endereço:</span>
+                              <span>{order.customer.address}</span>
+                            </div>
+                          )}
+                          {order.customer?.paymentMethod && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <CreditCard className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium">Pagamento:</span>
+                              <span>{order.customer.paymentMethod}</span>
+                            </div>
+                          )}
+                          {order.customer?.notes && (
+                            <div className="flex items-start gap-2 text-sm">
+                              <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
+                              <span className="font-medium">Obs:</span>
+                              <span>{order.customer.notes}</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* </CHANGE> */}
+
                         <div className="space-y-2 mb-4">
                           {order.items.map((item, index) => (
                             <div key={index} className="flex justify-between">
@@ -2280,7 +2344,21 @@ Confirma o fechamento?
                                 <p className="text-sm text-gray-500">{product.category_name || "Sem categoria"}</p>
                               </div>
                             </div>
+                            {/* </CHANGE> Botão para ocultar/mostrar produto no cardápio */}
                             <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleProductVisibility(product.id, product.visible)}
+                                title={product.visible ? "Ocultar do cardápio" : "Mostrar no cardápio"}
+                              >
+                                {product.visible ? (
+                                  <Eye className="w-4 h-4 text-green-600" />
+                                ) : (
+                                  <EyeOff className="w-4 h-4 text-gray-400" />
+                                )}
+                              </Button>
+                              {/* </CHANGE> */}
                               <Button variant="outline" size="sm" onClick={() => startEditProduct(product)}>
                                 <Edit className="w-4 h-4" />
                               </Button>

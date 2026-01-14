@@ -27,6 +27,9 @@ export interface Order {
   id?: number
   customer_name?: string
   customer_phone?: string
+  customer_address?: string
+  payment_method?: string
+  notes?: string
   items: Array<{
     id: number
     name: string
@@ -220,6 +223,9 @@ export async function createOrder(order: Omit<Order, "id" | "created_at" | "upda
     .insert({
       customer_name: order.customer_name || null,
       customer_phone: order.customer_phone || null,
+      customer_address: order.customer_address || null,
+      payment_method: order.payment_method || null,
+      notes: order.notes || null,
       items: order.items,
       total: order.total,
       status: order.status,

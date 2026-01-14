@@ -173,6 +173,9 @@ export default function DigitalMenu() {
     const orderData = {
       customer_name: customerData.name,
       customer_phone: customerData.phone,
+      customer_address: customerData.address,
+      payment_method: customerData.paymentMethod,
+      notes: customerData.observations,
       items: Object.entries(cart).map(([cartKey, cartItem]) => {
         const itemId = Number.parseInt(cartKey.split("-")[0])
         const item = visibleProducts.find((item) => item.id === itemId)
