@@ -14,11 +14,15 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log("[v0] API POST /orders - Body recebido:", body)
+
     const order = await createOrder(body)
+    console.log("[v0] Pedido criado com sucesso:", order)
+
     return NextResponse.json(order)
   } catch (error) {
-    console.error("Error creating order:", error)
-    return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
+    console.error("[v0] Error creating order:", error)
+    return NextResponse.json({ error: "Failed to create order", details: String(error) }, { status: 500 })
   }
 }
 

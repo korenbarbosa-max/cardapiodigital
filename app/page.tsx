@@ -190,6 +190,8 @@ export default function DigitalMenu() {
       status: "pendente",
     }
 
+    console.log("[v0] Enviando pedido:", orderData)
+
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -199,13 +201,18 @@ export default function DigitalMenu() {
         body: JSON.stringify(orderData),
       })
 
+      console.log("[v0] Response status:", response.status)
+
+      const responseData = await response.json()
+      console.log("[v0] Response data:", responseData)
+
       if (response.ok) {
-        const order = await response.json()
-        setLastOrder(order)
+        setLastOrder(responseData)
         setCart({})
         setShowCheckout(false)
         setShowOrderSuccess(true)
       } else {
+        console.error("[v0] Erro na API:", responseData)
         // Fallback to localStorage if API fails
         const order = {
           id: Date.now(),
@@ -223,7 +230,7 @@ export default function DigitalMenu() {
         setShowOrderSuccess(true)
       }
     } catch (error) {
-      console.error("Erro ao salvar pedido:", error)
+      console.error("[v0] Erro ao salvar pedido:", error)
       // Fallback to localStorage
       const order = {
         id: Date.now(),
