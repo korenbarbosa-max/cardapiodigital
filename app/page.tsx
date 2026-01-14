@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ShoppingCart,
   Plus,
@@ -716,23 +715,30 @@ export default function DigitalMenu() {
               <div className="space-y-3">
                 <div className="flex items-center space-x-2 text-sm font-medium text-gray-700">
                   <CreditCard className="w-4 h-4" />
-                  <span>Forma de Pagamento</span>
+                  <span>Forma de Pagamento *</span>
                 </div>
 
-                <Select
-                  value={customerData.paymentMethod}
-                  onValueChange={(value) => setCustomerData({ ...customerData, paymentMethod: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a forma de pagamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="cartao-debito">Cartão de Débito</SelectItem>
-                    <SelectItem value="cartao-credito">Cartão de Crédito</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "dinheiro", label: "Dinheiro" },
+                    { value: "pix", label: "PIX" },
+                    { value: "cartao-debito", label: "Cartão Débito" },
+                    { value: "cartao-credito", label: "Cartão Crédito" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCustomerData({ ...customerData, paymentMethod: option.value })}
+                      className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                        customerData.paymentMethod === option.value
+                          ? "border-orange-500 bg-orange-50 text-orange-700"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
