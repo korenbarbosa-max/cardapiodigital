@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -42,6 +42,8 @@ import {
   Receipt,
   Save,
   Trash,
+  Volume2,
+  VolumeX,
 } from "lucide-react"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -181,7 +183,39 @@ const transactionTypes = [
   { value: "saida", label: "Saída", icon: TrendingDown, color: "text-red-600" },
 ]
 
-const AdminPanel = () => {
+export default function AdminPanel() {
+  const previousOrdersCountRef = useRef<number>(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio("/notification-sound.mp3")
+      audioRef.current.volume = 0.7
+
+      // Carregar preferência de som do localStorage
+      const savedSoundPref = localStorage.getItem("soundEnabled")
+      if (savedSoundPref !== null) {
+        setSoundEnabled(JSON.parse(savedSoundPref))
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("soundEnabled", JSON.stringify(soundEnabled))
+    }
+  }, [soundEnabled])
+
+  const playNotificationSound = () => {
+    if (soundEnabled && audioRef.current) {
+      audioRef.current.currentTime = 0
+      audioRef.current.play().catch((err) => {
+        console.log("Não foi possível tocar o som:", err)
+      })
+    }
+  }
+
   const [stockMovementType, setStockMovementType] = useState<"entrada" | "saida" | "ajuste">("entrada")
   const [stockMovement, setStockMovement] = useState({
     productId: "",
@@ -343,6 +377,7 @@ const AdminPanel = () => {
   const loadOrders = async () => {
     try {
       const ordersResponse = await fetch("/api/orders")
+
       if (ordersResponse.ok) {
         const ordersData = await ordersResponse.json()
 
@@ -363,16 +398,20 @@ const AdminPanel = () => {
               address: order.customer_address || "",
               paymentMethod: order.payment_method || "",
               notes: order.notes || "",
-              // </CHANGE>
             },
           }
         })
+
+        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pending")
+        if (previousOrdersCountRef.current > 0 && pendingOrders.length > previousOrdersCountRef.current) {
+          playNotificationSound()
+        }
+        previousOrdersCountRef.current = pendingOrders.length
 
         setOrders(convertedOrders)
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        // Silently ignore abort errors
         return
       }
       console.error("Erro ao carregar pedidos:", error)
@@ -488,10 +527,10 @@ const AdminPanel = () => {
       setLoading(true)
       await loadProducts()
       await loadCategories()
+      await loadOrders() // Ensure orders are loaded initially
 
       loadExtras() // Load product-specific extras from localStorage
       // loadGlobalExtras() // Load global extras - temporariamente desabilitado
-      // </CHANGE>
 
       const savedCredentials = localStorage.getItem("admin_credentials")
       if (savedCredentials) {
@@ -892,7 +931,6 @@ const AdminPanel = () => {
       console.error("Erro ao alterar visibilidade:", error)
     }
   }
-  // </CHANGE>
 
   const enableStockControl = async (productId: number) => {
     try {
@@ -1631,15 +1669,25 @@ Confirma o fechamento?
               </div>
             </div>
 
-            <div className="flex items-center space-x-1 sm:space-x-3">
-              <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 sm:h-9 bg-transparent">
-                <LogOut className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="h-9 px-2 sm:px-3"
+                title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
+              >
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                <span className="hidden sm:inline ml-1">{soundEnabled ? "Som On" : "Som Off"}</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="h-9 px-2 sm:px-3 bg-transparent">
+                <LogOut className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Sair</span>
               </Button>
 
               <Link href="/">
-                <Button variant="outline" size="sm" className="h-8 sm:h-9 bg-transparent">
-                  <Home className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                <Button variant="outline" size="sm" className="h-9 px-2 sm:px-3 bg-transparent">
+                  <Home className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Cardápio</span>
                 </Button>
               </Link>
@@ -1909,7 +1957,6 @@ Confirma o fechamento?
                             </div>
                           )}
                         </div>
-                        {/* </CHANGE> */}
 
                         <div className="space-y-2 mb-4">
                           {order.items.map((item, index) => (
@@ -2344,7 +2391,6 @@ Confirma o fechamento?
                                 <p className="text-sm text-gray-500">{product.category_name || "Sem categoria"}</p>
                               </div>
                             </div>
-                            {/* </CHANGE> Botão para ocultar/mostrar produto no cardápio */}
                             <div className="flex items-center space-x-2">
                               <Button
                                 variant="outline"
@@ -2358,7 +2404,6 @@ Confirma o fechamento?
                                   <EyeOff className="w-4 h-4 text-gray-400" />
                                 )}
                               </Button>
-                              {/* </CHANGE> */}
                               <Button variant="outline" size="sm" onClick={() => startEditProduct(product)}>
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -3434,5 +3479,3 @@ Confirma o fechamento?
     </div>
   )
 }
-
-export default AdminPanel
