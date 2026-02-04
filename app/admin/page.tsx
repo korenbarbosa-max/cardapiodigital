@@ -184,7 +184,8 @@ const transactionTypes = [
 ]
 
 export default function AdminPanel() {
-  const previousOrdersCountRef = useRef<number>(0)
+  const previousOrderIdsRef = useRef<Set<number>>(new Set())
+  const isFirstLoadRef = useRef<boolean>(true)
   const audioContextRef = useRef<AudioContext | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
@@ -463,11 +464,23 @@ export default function AdminPanel() {
           }
         })
 
-        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pending")
-        if (previousOrdersCountRef.current > 0 && pendingOrders.length > previousOrdersCountRef.current) {
-          playNotificationSound()
+        // Detectar novos pedidos comparando IDs
+        const currentOrderIds = new Set(convertedOrders.map((o: any) => o.id))
+        
+        // Só toca som se não for o primeiro carregamento
+        if (!isFirstLoadRef.current) {
+          // Verifica se há pedidos novos (IDs que não existiam antes)
+          const newOrders = convertedOrders.filter((o: any) => !previousOrderIdsRef.current.has(o.id))
+          if (newOrders.length > 0) {
+            console.log("[v0] Novo(s) pedido(s) detectado(s):", newOrders.length)
+            playNotificationSound()
+          }
+        } else {
+          isFirstLoadRef.current = false
         }
-        previousOrdersCountRef.current = pendingOrders.length
+        
+        // Atualiza os IDs conhecidos
+        previousOrderIdsRef.current = currentOrderIds
 
         setOrders(convertedOrders)
       }
