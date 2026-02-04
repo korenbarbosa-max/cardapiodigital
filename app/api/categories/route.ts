@@ -8,7 +8,8 @@ export async function GET() {
     return NextResponse.json(categories)
   } catch (error) {
     console.error("Error fetching categories:", error)
-    return NextResponse.json({ error: "Failed to fetch categories" }, { status: 500 })
+    // Return empty array instead of error to allow app to show empty state
+    return NextResponse.json([])
   }
 }
 
