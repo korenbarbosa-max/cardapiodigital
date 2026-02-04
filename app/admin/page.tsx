@@ -3118,6 +3118,133 @@ const handleSaveDeliveryConfig = () => {
 
                   <div className="mt-8">
                     <h3 className="text-xl font-bold mb-4">Relatório de Caixa</h3>
+                    
+                    {/* Botões de atalho para períodos */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date().toISOString().split("T")[0]
+                          setReportFilters({ ...reportFilters, startDate: today, endDate: today })
+                        }}
+                      >
+                        Hoje
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const yesterday = new Date(today)
+                          yesterday.setDate(yesterday.getDate() - 1)
+                          const yesterdayStr = yesterday.toISOString().split("T")[0]
+                          setReportFilters({ ...reportFilters, startDate: yesterdayStr, endDate: yesterdayStr })
+                        }}
+                      >
+                        Ontem
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const dayOfWeek = today.getDay()
+                          const startOfWeek = new Date(today)
+                          startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)) // Segunda-feira
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: startOfWeek.toISOString().split("T")[0], 
+                            endDate: today.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Esta Semana
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const dayOfWeek = today.getDay()
+                          const endOfLastWeek = new Date(today)
+                          endOfLastWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 0 : dayOfWeek)) // Domingo passado
+                          const startOfLastWeek = new Date(endOfLastWeek)
+                          startOfLastWeek.setDate(endOfLastWeek.getDate() - 6) // Segunda passada
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: startOfLastWeek.toISOString().split("T")[0], 
+                            endDate: endOfLastWeek.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Semana Passada
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: startOfMonth.toISOString().split("T")[0], 
+                            endDate: today.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Este Mês
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+                          const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: startOfLastMonth.toISOString().split("T")[0], 
+                            endDate: endOfLastMonth.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Mês Passado
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const last7Days = new Date(today)
+                          last7Days.setDate(today.getDate() - 6)
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: last7Days.toISOString().split("T")[0], 
+                            endDate: today.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Últimos 7 dias
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const today = new Date()
+                          const last30Days = new Date(today)
+                          last30Days.setDate(today.getDate() - 29)
+                          setReportFilters({ 
+                            ...reportFilters, 
+                            startDate: last30Days.toISOString().split("T")[0], 
+                            endDate: today.toISOString().split("T")[0] 
+                          })
+                        }}
+                      >
+                        Últimos 30 dias
+                      </Button>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div>
                         <Label htmlFor="report-start-date">Data Inicial</Label>
