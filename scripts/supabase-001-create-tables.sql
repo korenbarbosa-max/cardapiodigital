@@ -53,14 +53,17 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cash_transactions_created_at ON cash_transactions(created_at DESC);
 
--- Inserir categorias padrão
-INSERT INTO categories (name) VALUES 
-  ('Lanches'),
-  ('Bebidas'),
-  ('Sobremesas'),
-  ('Pratos Principais'),
-  ('Petiscos')
-ON CONFLICT (name) DO NOTHING;
+-- Inserir categorias padrão (apenas se não existirem)
+INSERT INTO categories (name) 
+SELECT 'Lanches' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Lanches');
+INSERT INTO categories (name) 
+SELECT 'Bebidas' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Bebidas');
+INSERT INTO categories (name) 
+SELECT 'Sobremesas' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Sobremesas');
+INSERT INTO categories (name) 
+SELECT 'Pratos Principais' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Pratos Principais');
+INSERT INTO categories (name) 
+SELECT 'Petiscos' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Petiscos');
 
 -- Habilitar Row Level Security (RLS) - importante para segurança
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -70,6 +73,27 @@ ALTER TABLE cash_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS: permitir acesso público para leitura (você pode ajustar conforme necessário)
 -- IMPORTANTE: Essas políticas permitem acesso total. Ajuste para produção!
+
+-- Drop existing policies if they exist and recreate
+DROP POLICY IF EXISTS "Enable read access for all users" ON categories;
+DROP POLICY IF EXISTS "Enable insert for all users" ON categories;
+DROP POLICY IF EXISTS "Enable update for all users" ON categories;
+DROP POLICY IF EXISTS "Enable delete for all users" ON categories;
+
+DROP POLICY IF EXISTS "Enable read access for all users" ON products;
+DROP POLICY IF EXISTS "Enable insert for all users" ON products;
+DROP POLICY IF EXISTS "Enable update for all users" ON products;
+DROP POLICY IF EXISTS "Enable delete for all users" ON products;
+
+DROP POLICY IF EXISTS "Enable read access for all users" ON orders;
+DROP POLICY IF EXISTS "Enable insert for all users" ON orders;
+DROP POLICY IF EXISTS "Enable update for all users" ON orders;
+DROP POLICY IF EXISTS "Enable delete for all users" ON orders;
+
+DROP POLICY IF EXISTS "Enable read access for all users" ON cash_transactions;
+DROP POLICY IF EXISTS "Enable insert for all users" ON cash_transactions;
+DROP POLICY IF EXISTS "Enable update for all users" ON cash_transactions;
+DROP POLICY IF EXISTS "Enable delete for all users" ON cash_transactions;
 
 -- Categories: permitir leitura e escrita para todos
 CREATE POLICY "Enable read access for all users" ON categories
