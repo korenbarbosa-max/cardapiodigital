@@ -665,8 +665,28 @@ export default function AdminPanel() {
     alert("Credenciais alteradas com sucesso!")
   }
 
-  const updateOrderStatus = (orderId: number, newStatus: string) => {
+const updateOrderStatus = async (orderId: number, newStatus: string) => {
+    // Atualiza localmente primeiro para feedback imediato
     setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+    
+    // Persiste no banco de dados
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: orderId, status: newStatus }),
+      })
+      
+      if (!response.ok) {
+        console.error("Erro ao atualizar status do pedido no servidor")
+        // Reverte em caso de erro
+        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: order.status } : order)))
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status do pedido:", error)
+    }
   }
 
   const printOrder = (orderId: number) => {
