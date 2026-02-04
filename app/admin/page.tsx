@@ -204,7 +204,7 @@ export default function AdminPanel() {
     }
   }, [soundEnabled])
 
-  const playNotificationSound = () => {
+  const playNotificationSound = async () => {
     if (!soundEnabled) return
     
     try {
@@ -214,6 +214,11 @@ export default function AdminPanel() {
       }
       
       const ctx = audioContextRef.current
+      
+      // Resumir o contexto se estiver suspenso (política de autoplay)
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
       
       // Função para tocar um beep
       const playBeep = (frequency: number, startTime: number, duration: number) => {
@@ -226,7 +231,7 @@ export default function AdminPanel() {
         oscillator.frequency.value = frequency
         oscillator.type = "sine"
         
-        gainNode.gain.setValueAtTime(0.4, startTime)
+        gainNode.gain.setValueAtTime(0.5, startTime)
         gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
         
         oscillator.start(startTime)
@@ -1759,13 +1764,31 @@ const handleSaveDeliveryConfig = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSoundEnabled(!soundEnabled)}
+                onClick={() => {
+                  const newState = !soundEnabled
+                  setSoundEnabled(newState)
+                  // Toca o som de teste quando ativar para inicializar o AudioContext
+                  if (newState) {
+                    setTimeout(() => playNotificationSound(), 100)
+                  }
+                }}
                 className="h-9 px-2 sm:px-3"
                 title={soundEnabled ? "Desativar som de notificação" : "Ativar som de notificação"}
               >
                 {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                 <span className="hidden sm:inline ml-1">{soundEnabled ? "Som On" : "Som Off"}</span>
               </Button>
+              {soundEnabled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => playNotificationSound()}
+                  className="h-9 px-2 sm:px-3"
+                  title="Testar som de notificação"
+                >
+                  <span className="text-xs">Testar Som</span>
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleLogout} className="h-9 px-2 sm:px-3 bg-transparent">
                 <LogOut className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Sair</span>
