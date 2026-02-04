@@ -50,6 +50,16 @@ export default function DigitalMenu() {
     enabled: true,
   })
 
+  const [scheduleConfig, setScheduleConfig] = useState({
+    enabled: true,
+    allowPreOrder: true,
+    weekdays: { open: "13:00", close: "22:00", closed: false },
+    saturday: { open: "17:00", close: "22:00", closed: false },
+    sunday: { open: "", close: "", closed: true },
+  })
+
+  const [isPreOrder, setIsPreOrder] = useState(false)
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -107,6 +117,12 @@ export default function DigitalMenu() {
     const savedDeliveryConfig = localStorage.getItem("deliveryConfig")
     if (savedDeliveryConfig) {
       setDeliveryConfig(JSON.parse(savedDeliveryConfig))
+    }
+
+    // Load schedule config from localStorage
+    const savedScheduleConfig = localStorage.getItem("scheduleConfig")
+    if (savedScheduleConfig) {
+      setScheduleConfig(JSON.parse(savedScheduleConfig))
     }
   }, [])
 
@@ -172,6 +188,78 @@ export default function DigitalMenu() {
     return getCartTotal() + getDeliveryFee()
   }
 
+  const isStoreOpen = () => {
+    const now = new Date()
+    const dayOfWeek = now.getDay() // 0 = Domingo, 6 = Sábado
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0')
+
+    let schedule
+    if (dayOfWeek === 0) {
+      schedule = scheduleConfig.sunday
+    } else if (dayOfWeek === 6) {
+      schedule = scheduleConfig.saturday
+    } else {
+      schedule = scheduleConfig.weekdays
+    }
+
+    if (schedule.closed) return false
+    if (!schedule.open || !schedule.close) return false
+
+    return currentTime >= schedule.open && currentTime <= schedule.close
+  }
+
+  const getNextOpenTime = () => {
+    const now = new Date()
+    const dayOfWeek = now.getDay()
+    const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+    
+    // Verifica hoje primeiro
+    let schedule
+    if (dayOfWeek === 0) {
+      schedule = scheduleConfig.sunday
+    } else if (dayOfWeek === 6) {
+      schedule = scheduleConfig.saturday
+    } else {
+      schedule = scheduleConfig.weekdays
+    }
+
+    const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0')
+    
+    // Se ainda vai abrir hoje
+    if (!schedule.closed && schedule.open && currentTime < schedule.open) {
+      return `Hoje às ${schedule.open}`
+    }
+
+    // Procura o próximo dia aberto
+    for (let i = 1; i <= 7; i++) {
+      const nextDay = (dayOfWeek + i) % 7
+      let nextSchedule
+      if (nextDay === 0) {
+        nextSchedule = scheduleConfig.sunday
+      } else if (nextDay === 6) {
+        nextSchedule = scheduleConfig.saturday
+      } else {
+        nextSchedule = scheduleConfig.weekdays
+      }
+
+      if (!nextSchedule.closed && nextSchedule.open) {
+        if (i === 1) {
+          return `Amanhã às ${nextSchedule.open}`
+        }
+        return `${days[nextDay]} às ${nextSchedule.open}`
+      }
+    }
+
+    return "Em breve"
+  }
+
+  const getTodaySchedule = () => {
+    const dayOfWeek = new Date().getDay()
+    if (dayOfWeek === 0) return scheduleConfig.sunday
+    if (dayOfWeek === 6) return scheduleConfig.saturday
+    return scheduleConfig.weekdays
+  }
+
   const toggleExtra = (itemId: number, extra: { name: string; price: number }) => {
     setSelectedExtras((prev) => {
       const current = prev[itemId] || []
@@ -194,12 +282,14 @@ export default function DigitalMenu() {
   const handleFinishOrder = async () => {
     if (Object.keys(cart).length === 0) return
 
-    const orderData = {
-      customer_name: customerData.name,
-      customer_phone: customerData.phone,
-      customer_address: customerData.address,
-      payment_method: customerData.paymentMethod,
-      notes: customerData.observations,
+const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
+  const orderData = {
+  customer_name: customerData.name,
+  customer_phone: customerData.phone,
+  customer_address: customerData.address,
+  payment_method: customerData.paymentMethod,
+  notes: isPreOrderNow ? `[ENCOMENDA] ${customerData.observations}` : customerData.observations,
+  is_pre_order: isPreOrderNow,
       items: Object.entries(cart).map(([cartKey, cartItem]) => {
         const itemId = Number.parseInt(cartKey.split("-")[0])
         const item = visibleProducts.find((item) => item.id === itemId)
@@ -368,6 +458,27 @@ export default function DigitalMenu() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      {/* Banner de Status - Aberto/Fechado */}
+      {scheduleConfig.enabled && (
+        <div className={`${isStoreOpen() ? 'bg-green-600' : 'bg-red-600'} text-white py-2 px-4 text-center text-sm`}>
+          {isStoreOpen() ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+              Estamos abertos! Horário de hoje: {getTodaySchedule().open} - {getTodaySchedule().close}
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2 flex-wrap">
+              <span>Estamos fechados no momento.</span>
+              {scheduleConfig.allowPreOrder ? (
+                <span className="font-medium">Faça sua encomenda para {getNextOpenTime()}!</span>
+              ) : (
+                <span>Abrimos {getNextOpenTime()}</span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+      
       <header className="bg-white shadow-sm border-b border-orange-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
@@ -877,20 +988,27 @@ export default function DigitalMenu() {
                 </div>
               </div>
 
-              <div className="flex space-x-2 pt-4">
-                <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setShowCheckout(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                  onClick={handleFinishOrder}
-                  disabled={
-                    !customerData.name || !customerData.phone || !customerData.address || !customerData.paymentMethod
-                  }
-                >
-                  Confirmar Pedido
-                </Button>
-              </div>
+<div className="flex space-x-2 pt-4">
+  <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setShowCheckout(false)}>
+  Cancelar
+  </Button>
+  <Button
+  className={`flex-1 ${!isStoreOpen() && scheduleConfig.allowPreOrder ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'}`}
+  onClick={handleFinishOrder}
+  disabled={
+  !customerData.name || !customerData.phone || !customerData.address || !customerData.paymentMethod || (!isStoreOpen() && !scheduleConfig.allowPreOrder)
+  }
+  >
+  {!isStoreOpen() && scheduleConfig.allowPreOrder ? 'Fazer Encomenda' : 'Confirmar Pedido'}
+  </Button>
+  </div>
+  {!isStoreOpen() && (
+    <p className={`text-xs text-center mt-2 ${scheduleConfig.allowPreOrder ? 'text-orange-600' : 'text-red-600'}`}>
+      {scheduleConfig.allowPreOrder 
+        ? `Este pedido será preparado quando abrirmos (${getNextOpenTime()})`
+        : 'Desculpe, não estamos aceitando pedidos no momento.'}
+    </p>
+  )}
             </CardContent>
           </Card>
         </div>
