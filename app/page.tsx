@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+// Atualizado em 04/02/2026
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
