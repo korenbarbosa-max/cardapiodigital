@@ -185,14 +185,11 @@ const transactionTypes = [
 
 export default function AdminPanel() {
   const previousOrdersCountRef = useRef<number>(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      audioRef.current = new Audio("/notification-sound.mp3")
-      audioRef.current.volume = 0.7
-
       // Carregar preferência de som do localStorage
       const savedSoundPref = localStorage.getItem("soundEnabled")
       if (savedSoundPref !== null) {
@@ -208,11 +205,42 @@ export default function AdminPanel() {
   }, [soundEnabled])
 
   const playNotificationSound = () => {
-    if (soundEnabled && audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch((err) => {
-        console.log("Não foi possível tocar o som:", err)
-      })
+    if (!soundEnabled) return
+    
+    try {
+      // Criar AudioContext se não existir
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      }
+      
+      const ctx = audioContextRef.current
+      
+      // Função para tocar um beep
+      const playBeep = (frequency: number, startTime: number, duration: number) => {
+        const oscillator = ctx.createOscillator()
+        const gainNode = ctx.createGain()
+        
+        oscillator.connect(gainNode)
+        gainNode.connect(ctx.destination)
+        
+        oscillator.frequency.value = frequency
+        oscillator.type = "sine"
+        
+        gainNode.gain.setValueAtTime(0.4, startTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
+        
+        oscillator.start(startTime)
+        oscillator.stop(startTime + duration)
+      }
+      
+      const now = ctx.currentTime
+      // Sequência de 3 beeps agradáveis (som de notificação)
+      playBeep(880, now, 0.15)         // A5
+      playBeep(1100, now + 0.18, 0.15) // C#6
+      playBeep(1320, now + 0.36, 0.25) // E6
+      
+    } catch (err) {
+      console.log("Não foi possível tocar o som:", err)
     }
   }
 
