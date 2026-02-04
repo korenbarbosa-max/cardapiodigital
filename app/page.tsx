@@ -436,13 +436,13 @@ export default function DigitalMenu() {
 
               {categories.map((category) => (
                 <TabsContent key={category} value={category}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-6">
                     {getProductsByCategory(category).map((item) => (
                       <Card
                         key={item.id}
                         className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
                       >
-                        <div className="aspect-[4/3] relative bg-gray-100 overflow-hidden">
+                        <div className="aspect-square sm:aspect-[4/3] relative bg-gray-100 overflow-hidden">
                           <img
                             src={item.image || "/placeholder.svg?height=240&width=320&query=delicious food dish"}
                             alt={item.name}
@@ -453,35 +453,35 @@ export default function DigitalMenu() {
                             }}
                           />
                         </div>
-                        <CardHeader className="flex-grow p-3 sm:p-4">
-                          <div className="flex justify-between items-start gap-2 sm:gap-3">
+                        <CardHeader className="flex-grow p-2 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-3">
                             <div className="flex-1 min-w-0">
-                              <CardTitle className="text-base sm:text-lg leading-tight truncate">{item.name}</CardTitle>
-                              <CardDescription className="mt-1 sm:mt-2 text-xs sm:text-sm line-clamp-2 text-gray-600">
+                              <CardTitle className="text-xs sm:text-lg leading-tight line-clamp-2">{item.name}</CardTitle>
+                              <CardDescription className="mt-0.5 sm:mt-2 text-[10px] sm:text-sm line-clamp-2 text-gray-600 hidden sm:block">
                                 {item.description}
                               </CardDescription>
                             </div>
                             <Badge
                               variant="secondary"
-                              className="text-base sm:text-lg font-bold whitespace-nowrap bg-orange-100 text-orange-800"
+                              className="text-xs sm:text-lg font-bold whitespace-nowrap bg-orange-100 text-orange-800 w-fit"
                             >
                               R$ {item.price.toFixed(2)}
                             </Badge>
                           </div>
                         </CardHeader>
-                        <CardContent className="pt-0 p-3 sm:p-4">
-                          <div className="flex items-center justify-between gap-2">
+                        <CardContent className="pt-0 p-2 sm:p-4">
+                          <div className="flex items-center justify-center sm:justify-between gap-1 sm:gap-2">
                             <div className="flex items-center space-x-1 sm:space-x-2">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => removeFromCart(`${item.id}-${JSON.stringify([])}`)}
                                 disabled={!cart[`${item.id}-${JSON.stringify([])}`]}
-                                className="h-8 w-8 sm:h-9 sm:w-9 p-0 touch-manipulation"
+                                className="h-6 w-6 sm:h-9 sm:w-9 p-0 touch-manipulation"
                               >
-                                <Minus className="w-4 h-4" />
+                                <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              <span className="w-6 sm:w-8 text-center font-medium text-sm sm:text-base">
+                              <span className="w-4 sm:w-8 text-center font-medium text-xs sm:text-base">
                                 {cart[`${item.id}-${JSON.stringify([])}`]?.quantity || 0}
                               </span>
                               <Button
@@ -494,9 +494,9 @@ export default function DigitalMenu() {
                                     addToCartWithExtras(item.id, [])
                                   }
                                 }}
-                                className="h-8 w-8 sm:h-9 sm:w-9 p-0 touch-manipulation"
+                                className="h-6 w-6 sm:h-9 sm:w-9 p-0 touch-manipulation"
                               >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
                             </div>
                             <button
@@ -507,7 +507,7 @@ export default function DigitalMenu() {
                                   addToCartWithExtras(item.id, [])
                                 }
                               }}
-                              className="inline-flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap rounded-md text-xs sm:text-sm font-medium transition-all h-8 sm:h-9 px-3 sm:px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 touch-manipulation"
+                              className="hidden sm:inline-flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap rounded-md text-xs sm:text-sm font-medium transition-all h-8 sm:h-9 px-3 sm:px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 touch-manipulation"
                               style={{
                                 backgroundColor: "#ea580c !important",
                                 color: "#ffffff !important",
