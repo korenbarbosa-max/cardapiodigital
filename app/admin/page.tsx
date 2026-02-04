@@ -221,8 +221,8 @@ export default function AdminPanel() {
         await ctx.resume()
       }
       
-      // Função para tocar um beep
-      const playBeep = (frequency: number, startTime: number, duration: number) => {
+      // Função para tocar um beep com tipo de onda e volume configuráveis
+      const playBeep = (frequency: number, startTime: number, duration: number, type: OscillatorType = "square", volume: number = 0.7) => {
         const oscillator = ctx.createOscillator()
         const gainNode = ctx.createGain()
         
@@ -230,9 +230,9 @@ export default function AdminPanel() {
         gainNode.connect(ctx.destination)
         
         oscillator.frequency.value = frequency
-        oscillator.type = "sine"
+        oscillator.type = type
         
-        gainNode.gain.setValueAtTime(0.5, startTime)
+        gainNode.gain.setValueAtTime(volume, startTime)
         gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
         
         oscillator.start(startTime)
@@ -240,10 +240,24 @@ export default function AdminPanel() {
       }
       
       const now = ctx.currentTime
-      // Sequência de 3 beeps agradáveis (som de notificação)
-      playBeep(880, now, 0.15)         // A5
-      playBeep(1100, now + 0.18, 0.15) // C#6
-      playBeep(1320, now + 0.36, 0.25) // E6
+      
+      // Som de alerta bem chamativo - estilo alarme de pedido
+      // Primeira sequência rápida
+      playBeep(1500, now, 0.1, "square", 0.8)
+      playBeep(1800, now + 0.1, 0.1, "square", 0.8)
+      playBeep(1500, now + 0.2, 0.1, "square", 0.8)
+      playBeep(1800, now + 0.3, 0.1, "square", 0.8)
+      
+      // Pausa e segunda sequência mais grave
+      playBeep(1200, now + 0.5, 0.15, "sawtooth", 0.7)
+      playBeep(1500, now + 0.65, 0.15, "sawtooth", 0.7)
+      playBeep(1800, now + 0.8, 0.2, "sawtooth", 0.7)
+      
+      // Finalização com tom de alerta
+      playBeep(2000, now + 1.1, 0.15, "square", 0.9)
+      playBeep(1600, now + 1.25, 0.15, "square", 0.9)
+      playBeep(2000, now + 1.4, 0.15, "square", 0.9)
+      playBeep(2400, now + 1.55, 0.3, "square", 0.9)
       
     } catch (err) {
       console.log("Não foi possível tocar o som:", err)
@@ -472,7 +486,6 @@ export default function AdminPanel() {
           // Verifica se há pedidos novos (IDs que não existiam antes)
           const newOrders = convertedOrders.filter((o: any) => !previousOrderIdsRef.current.has(o.id))
           if (newOrders.length > 0) {
-            console.log("[v0] Novo(s) pedido(s) detectado(s):", newOrders.length)
             playNotificationSound()
           }
         } else {
