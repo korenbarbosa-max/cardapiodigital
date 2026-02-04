@@ -392,7 +392,15 @@ export default function DigitalMenu() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
           <div className="lg:col-span-3">
-            {categories.length === 0 ? (
+            {isLoading ? (
+              <Card className="p-8 text-center">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
+                  <h2 className="text-xl font-semibold text-gray-800">Carregando cardapio...</h2>
+                  <p className="text-gray-600">Aguarde enquanto buscamos os produtos</p>
+                </div>
+              </Card>
+            ) : categories.length === 0 ? (
               <Card className="p-8 text-center">
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center">
