@@ -319,6 +319,34 @@ export default function AdminPanel() {
     return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
   })
 
+  const [deliveryConfig, setDeliveryConfig] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("deliveryConfig")
+      return saved ? JSON.parse(saved) : { fee: 0, freeDeliveryMinimum: 0, enabled: true }
+    }
+    return { fee: 0, freeDeliveryMinimum: 0, enabled: true }
+  })
+
+  const [scheduleConfig, setScheduleConfig] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("scheduleConfig")
+      return saved ? JSON.parse(saved) : {
+        enabled: true,
+        allowPreOrder: true,
+        weekdays: { open: "13:00", close: "22:00", closed: false }, // Segunda a Sexta
+        saturday: { open: "17:00", close: "22:00", closed: false },
+        sunday: { open: "", close: "", closed: true },
+      }
+    }
+    return {
+      enabled: true,
+      allowPreOrder: true,
+      weekdays: { open: "13:00", close: "22:00", closed: false },
+      saturday: { open: "17:00", close: "22:00", closed: false },
+      sunday: { open: "", close: "", closed: true },
+    }
+  })
+
   const [cashBalance, setCashBalance] = useState({
     newBalance: "",
     reason: "",
@@ -657,8 +685,28 @@ export default function AdminPanel() {
     alert("Credenciais alteradas com sucesso!")
   }
 
-  const updateOrderStatus = (orderId: number, newStatus: string) => {
+const updateOrderStatus = async (orderId: number, newStatus: string) => {
+    // Atualiza localmente primeiro para feedback imediato
     setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+    
+    // Persiste no banco de dados
+    try {
+      const response = await fetch("/api/orders", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: orderId, status: newStatus }),
+      })
+      
+      if (!response.ok) {
+        console.error("Erro ao atualizar status do pedido no servidor")
+        // Reverte em caso de erro
+        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: order.status } : order)))
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status do pedido:", error)
+    }
   }
 
   const printOrder = (orderId: number) => {
@@ -1429,6 +1477,16 @@ Confirma o fechamento?
     }
     localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig))
     alert("Configuração do WhatsApp salva com sucesso!")
+  }
+
+const handleSaveDeliveryConfig = () => {
+  localStorage.setItem("deliveryConfig", JSON.stringify(deliveryConfig))
+  alert("Configuração de entrega salva com sucesso!")
+  }
+
+  const handleSaveScheduleConfig = () => {
+    localStorage.setItem("scheduleConfig", JSON.stringify(scheduleConfig))
+    alert("Horário de funcionamento salvo com sucesso!")
   }
 
   const addCategory = async () => {
@@ -3422,8 +3480,221 @@ Confirma o fechamento?
                   <Button onClick={handleSaveWhatsappConfig}>Salvar Configurações do WhatsApp</Button>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Alterar Credenciais</h3>
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-2">Taxa de Entrega</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="delivery-fee">Taxa de Entrega (R$)</Label>
+                      <Input
+                        id="delivery-fee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={deliveryConfig.fee || ""}
+                        onChange={(e) => setDeliveryConfig({ ...deliveryConfig, fee: Number(e.target.value) })}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Valor cobrado por entrega</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="free-delivery-min">Frete Grátis a partir de (R$)</Label>
+                      <Input
+                        id="free-delivery-min"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={deliveryConfig.freeDeliveryMinimum || ""}
+                        onChange={(e) => setDeliveryConfig({ ...deliveryConfig, freeDeliveryMinimum: Number(e.target.value) })}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Deixe 0 para desativar</p>
+                    </div>
+                    <div className="flex items-end">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="delivery-enabled"
+                          checked={deliveryConfig.enabled}
+                          onChange={(e) => setDeliveryConfig({ ...deliveryConfig, enabled: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="delivery-enabled">Cobrar taxa de entrega</Label>
+                      </div>
+                    </div>
+                  </div>
+<Button onClick={handleSaveDeliveryConfig} className="mt-4">Salvar Configurações de Entrega</Button>
+  </div>
+
+  <div className="border-t pt-6">
+    <h3 className="text-lg font-semibold mb-2">Horário de Funcionamento</h3>
+    <div className="space-y-4">
+      <div className="flex items-center space-x-2 mb-4">
+        <input
+          type="checkbox"
+          id="schedule-enabled"
+          checked={scheduleConfig.enabled}
+          onChange={(e) => setScheduleConfig({ ...scheduleConfig, enabled: e.target.checked })}
+          className="w-4 h-4 rounded border-gray-300"
+        />
+        <Label htmlFor="schedule-enabled">Exibir horário de funcionamento para clientes</Label>
+      </div>
+      
+      <div className="flex items-center space-x-2 mb-4">
+        <input
+          type="checkbox"
+          id="allow-preorder"
+          checked={scheduleConfig.allowPreOrder}
+          onChange={(e) => setScheduleConfig({ ...scheduleConfig, allowPreOrder: e.target.checked })}
+          className="w-4 h-4 rounded border-gray-300"
+        />
+        <Label htmlFor="allow-preorder">Permitir encomendas quando fechado</Label>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Segunda a Sexta */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium">Segunda a Sexta</span>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="weekdays-closed"
+                checked={scheduleConfig.weekdays.closed}
+                onChange={(e) => setScheduleConfig({ 
+                  ...scheduleConfig, 
+                  weekdays: { ...scheduleConfig.weekdays, closed: e.target.checked } 
+                })}
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <Label htmlFor="weekdays-closed" className="text-sm">Fechado</Label>
+            </div>
+          </div>
+          {!scheduleConfig.weekdays.closed && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Abre</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.weekdays.open}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    weekdays: { ...scheduleConfig.weekdays, open: e.target.value } 
+                  })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Fecha</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.weekdays.close}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    weekdays: { ...scheduleConfig.weekdays, close: e.target.value } 
+                  })}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sábado */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium">Sábado</span>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="saturday-closed"
+                checked={scheduleConfig.saturday.closed}
+                onChange={(e) => setScheduleConfig({ 
+                  ...scheduleConfig, 
+                  saturday: { ...scheduleConfig.saturday, closed: e.target.checked } 
+                })}
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <Label htmlFor="saturday-closed" className="text-sm">Fechado</Label>
+            </div>
+          </div>
+          {!scheduleConfig.saturday.closed && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Abre</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.saturday.open}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    saturday: { ...scheduleConfig.saturday, open: e.target.value } 
+                  })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Fecha</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.saturday.close}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    saturday: { ...scheduleConfig.saturday, close: e.target.value } 
+                  })}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Domingo */}
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-medium">Domingo</span>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="sunday-closed"
+                checked={scheduleConfig.sunday.closed}
+                onChange={(e) => setScheduleConfig({ 
+                  ...scheduleConfig, 
+                  sunday: { ...scheduleConfig.sunday, closed: e.target.checked } 
+                })}
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <Label htmlFor="sunday-closed" className="text-sm">Fechado</Label>
+            </div>
+          </div>
+          {!scheduleConfig.sunday.closed && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Abre</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.sunday.open}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    sunday: { ...scheduleConfig.sunday, open: e.target.value } 
+                  })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Fecha</Label>
+                <Input
+                  type="time"
+                  value={scheduleConfig.sunday.close}
+                  onChange={(e) => setScheduleConfig({ 
+                    ...scheduleConfig, 
+                    sunday: { ...scheduleConfig.sunday, close: e.target.value } 
+                  })}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    <Button onClick={handleSaveScheduleConfig} className="mt-4">Salvar Horário de Funcionamento</Button>
+  </div>
+  
+  <div className="border-t pt-6">
+  <h3 className="text-lg font-semibold mb-2">Alterar Credenciais</h3>
                   <Button onClick={() => setShowChangeCredentials(!showChangeCredentials)}>
                     {showChangeCredentials ? "Cancelar" : "Alterar Credenciais"}
                   </Button>
