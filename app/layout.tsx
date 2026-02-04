@@ -19,8 +19,8 @@ const robotoMono = Roboto_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Bom Pastel - Cardápio Digital",
-  description: "Cardápio digital do Bom Pastel - Faça seu pedido online!",
+  title: "v0 App",
+  description: "Created with v0",
   generator: "v0.app",
 }
 
