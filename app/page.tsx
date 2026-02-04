@@ -44,6 +44,12 @@ export default function DigitalMenu() {
     observations: "",
   })
 
+  const [deliveryConfig, setDeliveryConfig] = useState({
+    fee: 0,
+    freeDeliveryMinimum: 0,
+    enabled: true,
+  })
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -96,6 +102,12 @@ export default function DigitalMenu() {
     }
 
     loadData()
+
+    // Load delivery config from localStorage
+    const savedDeliveryConfig = localStorage.getItem("deliveryConfig")
+    if (savedDeliveryConfig) {
+      setDeliveryConfig(JSON.parse(savedDeliveryConfig))
+    }
   }, [])
 
   const visibleProducts = products.filter(
@@ -147,6 +159,19 @@ export default function DigitalMenu() {
     return Object.values(cart).reduce((total, cartItem) => total + cartItem.quantity, 0)
   }
 
+  const getDeliveryFee = () => {
+    if (!deliveryConfig.enabled) return 0
+    const cartTotal = getCartTotal()
+    if (deliveryConfig.freeDeliveryMinimum > 0 && cartTotal >= deliveryConfig.freeDeliveryMinimum) {
+      return 0
+    }
+    return deliveryConfig.fee
+  }
+
+  const getOrderTotal = () => {
+    return getCartTotal() + getDeliveryFee()
+  }
+
   const toggleExtra = (itemId: number, extra: { name: string; price: number }) => {
     setSelectedExtras((prev) => {
       const current = prev[itemId] || []
@@ -186,7 +211,9 @@ export default function DigitalMenu() {
           extras: cartItem.extras,
         }
       }),
-      total: getCartTotal(),
+      subtotal: getCartTotal(),
+      delivery_fee: getDeliveryFee(),
+      total: getOrderTotal(),
       status: "pendente",
     }
 
@@ -574,10 +601,29 @@ export default function DigitalMenu() {
                       )
                     })}
 
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center font-bold text-lg">
-                        <span>Total:</span>
+                    <div className="border-t pt-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span>Subtotal:</span>
                         <span>R$ {getCartTotal().toFixed(2)}</span>
+                      </div>
+                      {deliveryConfig.enabled && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span>Taxa de entrega:</span>
+                          {getDeliveryFee() === 0 && deliveryConfig.freeDeliveryMinimum > 0 ? (
+                            <span className="text-green-600 font-medium">Grátis</span>
+                          ) : (
+                            <span>R$ {getDeliveryFee().toFixed(2)}</span>
+                          )}
+                        </div>
+                      )}
+                      {deliveryConfig.enabled && deliveryConfig.freeDeliveryMinimum > 0 && getDeliveryFee() > 0 && (
+                        <p className="text-xs text-gray-500">
+                          Frete grátis em pedidos acima de R$ {deliveryConfig.freeDeliveryMinimum.toFixed(2)}
+                        </p>
+                      )}
+                      <div className="flex justify-between items-center font-bold text-lg pt-2 border-t">
+                        <span>Total:</span>
+                        <span>R$ {getOrderTotal().toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -602,7 +648,7 @@ export default function DigitalMenu() {
             className="w-full h-14 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-2xl text-base font-bold"
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
-            Ver Carrinho ({getCartItemCount()} itens) • R$ {getCartTotal().toFixed(2)}
+            Ver Carrinho ({getCartItemCount()} itens) • R$ {getOrderTotal().toFixed(2)}
           </Button>
         </div>
       )}
@@ -811,9 +857,23 @@ export default function DigitalMenu() {
                     </div>
                   )
                 })}
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span>Subtotal:</span>
+                  <span>R$ {getCartTotal().toFixed(2)}</span>
+                </div>
+                {deliveryConfig.enabled && (
+                  <div className="flex justify-between text-sm">
+                    <span>Taxa de entrega:</span>
+                    {getDeliveryFee() === 0 && deliveryConfig.freeDeliveryMinimum > 0 ? (
+                      <span className="text-green-600 font-medium">Grátis</span>
+                    ) : (
+                      <span>R$ {getDeliveryFee().toFixed(2)}</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
                   <span>Total:</span>
-                  <span>R$ {getCartTotal().toFixed(2)}</span>
+                  <span>R$ {getOrderTotal().toFixed(2)}</span>
                 </div>
               </div>
 
