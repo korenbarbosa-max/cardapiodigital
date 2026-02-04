@@ -221,43 +221,57 @@ export default function AdminPanel() {
         await ctx.resume()
       }
       
-      // Função para tocar um beep com tipo de onda e volume configuráveis
-      const playBeep = (frequency: number, startTime: number, duration: number, type: OscillatorType = "square", volume: number = 0.7) => {
-        const oscillator = ctx.createOscillator()
-        const gainNode = ctx.createGain()
+      // Função para criar som de sino
+      const playBell = (frequency: number, startTime: number, duration: number, volume: number = 0.5) => {
+        // Oscilador principal (tom fundamental)
+        const osc1 = ctx.createOscillator()
+        const gain1 = ctx.createGain()
+        osc1.type = "sine"
+        osc1.frequency.value = frequency
+        osc1.connect(gain1)
+        gain1.connect(ctx.destination)
         
-        oscillator.connect(gainNode)
-        gainNode.connect(ctx.destination)
+        // Harmônicos para dar timbre de sino
+        const osc2 = ctx.createOscillator()
+        const gain2 = ctx.createGain()
+        osc2.type = "sine"
+        osc2.frequency.value = frequency * 2.4 // Harmônico característico de sino
+        osc2.connect(gain2)
+        gain2.connect(ctx.destination)
         
-        oscillator.frequency.value = frequency
-        oscillator.type = type
+        const osc3 = ctx.createOscillator()
+        const gain3 = ctx.createGain()
+        osc3.type = "sine"
+        osc3.frequency.value = frequency * 5.95 // Outro harmônico de sino
+        osc3.connect(gain3)
+        gain3.connect(ctx.destination)
         
-        gainNode.gain.setValueAtTime(volume, startTime)
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration)
+        // Envelope de sino - ataque rápido, decay longo
+        gain1.gain.setValueAtTime(volume, startTime)
+        gain1.gain.exponentialRampToValueAtTime(volume * 0.4, startTime + 0.1)
+        gain1.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
         
-        oscillator.start(startTime)
-        oscillator.stop(startTime + duration)
+        gain2.gain.setValueAtTime(volume * 0.6, startTime)
+        gain2.gain.exponentialRampToValueAtTime(volume * 0.2, startTime + 0.05)
+        gain2.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7)
+        
+        gain3.gain.setValueAtTime(volume * 0.3, startTime)
+        gain3.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.4)
+        
+        osc1.start(startTime)
+        osc1.stop(startTime + duration)
+        osc2.start(startTime)
+        osc2.stop(startTime + duration)
+        osc3.start(startTime)
+        osc3.stop(startTime + duration)
       }
       
       const now = ctx.currentTime
       
-      // Som de alerta bem chamativo - estilo alarme de pedido
-      // Primeira sequência rápida
-      playBeep(1500, now, 0.1, "square", 0.8)
-      playBeep(1800, now + 0.1, 0.1, "square", 0.8)
-      playBeep(1500, now + 0.2, 0.1, "square", 0.8)
-      playBeep(1800, now + 0.3, 0.1, "square", 0.8)
-      
-      // Pausa e segunda sequência mais grave
-      playBeep(1200, now + 0.5, 0.15, "sawtooth", 0.7)
-      playBeep(1500, now + 0.65, 0.15, "sawtooth", 0.7)
-      playBeep(1800, now + 0.8, 0.2, "sawtooth", 0.7)
-      
-      // Finalização com tom de alerta
-      playBeep(2000, now + 1.1, 0.15, "square", 0.9)
-      playBeep(1600, now + 1.25, 0.15, "square", 0.9)
-      playBeep(2000, now + 1.4, 0.15, "square", 0.9)
-      playBeep(2400, now + 1.55, 0.3, "square", 0.9)
+      // Som de sino tocando 3 vezes - chamativo mas agradável
+      playBell(830, now, 1.2, 0.6)          // Primeiro sino
+      playBell(1050, now + 0.4, 1.0, 0.5)   // Segundo sino (mais agudo)
+      playBell(830, now + 0.8, 1.5, 0.7)    // Terceiro sino (mais forte)
       
     } catch (err) {
       console.log("Não foi possível tocar o som:", err)
