@@ -44,7 +44,12 @@ import {
   Trash,
   Volume2,
   VolumeX,
+  CalendarIcon,
 } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -3247,22 +3252,72 @@ const handleSaveDeliveryConfig = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div>
-                        <Label htmlFor="report-start-date">Data Inicial</Label>
-                        <Input
-                          id="report-start-date"
-                          type="date"
-                          value={reportFilters.startDate}
-                          onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
-                        />
+                        <Label>Data Inicial</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {reportFilters.startDate ? (
+                                format(new Date(reportFilters.startDate + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR })
+                              ) : (
+                                <span>Selecione a data</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={reportFilters.startDate ? new Date(reportFilters.startDate + "T12:00:00") : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setReportFilters({ 
+                                    ...reportFilters, 
+                                    startDate: format(date, "yyyy-MM-dd") 
+                                  })
+                                }
+                              }}
+                              locale={ptBR}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div>
-                        <Label htmlFor="report-end-date">Data Final</Label>
-                        <Input
-                          id="report-end-date"
-                          type="date"
-                          value={reportFilters.endDate}
-                          onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
-                        />
+                        <Label>Data Final</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {reportFilters.endDate ? (
+                                format(new Date(reportFilters.endDate + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR })
+                              ) : (
+                                <span>Selecione a data</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={reportFilters.endDate ? new Date(reportFilters.endDate + "T12:00:00") : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setReportFilters({ 
+                                    ...reportFilters, 
+                                    endDate: format(date, "yyyy-MM-dd") 
+                                  })
+                                }
+                              }}
+                              locale={ptBR}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div>
                         <Label htmlFor="report-payment-method">Método de Pagamento</Label>
