@@ -527,7 +527,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 lg:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
           <div className="lg:col-span-3">
             {isLoading ? (
@@ -753,7 +753,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
       </div>
 
       {Object.keys(cart).length > 0 && (
-        <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
+        <div className="lg:hidden fixed bottom-6 left-4 right-4 z-40">
           <Button
             onClick={() => setShowCheckout(true)}
             className="w-full h-14 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-2xl text-base font-bold"
