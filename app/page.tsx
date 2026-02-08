@@ -591,7 +591,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                             }}
                           />
                         </div>
-                        <CardHeader className="flex-grow p-2 sm:p-4">
+                        <CardHeader className="flex-1 p-2 sm:p-4">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-3">
                             <div className="flex-1 min-w-0">
                               <CardTitle className="text-xs sm:text-lg leading-tight line-clamp-2">{item.name}</CardTitle>
@@ -607,7 +607,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                             </Badge>
                           </div>
                         </CardHeader>
-                        <CardContent className="pt-0 p-2 sm:p-4">
+                        <CardContent className="pt-0 p-2 sm:p-4 mt-auto">
                           <div className="flex items-center justify-center sm:justify-between gap-1 sm:gap-2">
                             <div className="flex items-center space-x-1 sm:space-x-2">
                               <Button
