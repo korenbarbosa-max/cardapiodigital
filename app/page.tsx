@@ -843,22 +843,22 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
       )}
 
       {showCheckout && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <CardHeader>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto border-0 shadow-2xl bg-gradient-to-b from-orange-50 via-white to-orange-50">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg pb-4">
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-white">
                   <CreditCard className="w-5 h-5 mr-2" />
                   Finalizar Pedido
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)}>
+                <Button variant="ghost" size="sm" onClick={() => setShowCheckout(false)} className="text-white hover:bg-white/20">
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-5">
               <div className="space-y-3">
-                <div className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+                <div className="flex items-center space-x-2 text-sm font-medium text-orange-700">
                   <User className="w-4 h-4" />
                   <span>Dados do Cliente</span>
                 </div>
@@ -887,7 +887,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+                <div className="flex items-center space-x-2 text-sm font-medium text-orange-700">
                   <MapPin className="w-4 h-4" />
                   <span>Endereço de Entrega</span>
                 </div>
@@ -905,7 +905,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center space-x-2 text-sm font-medium text-gray-700">
+                <div className="flex items-center space-x-2 text-sm font-medium text-orange-700">
                   <CreditCard className="w-4 h-4" />
                   <span>Forma de Pagamento *</span>
                 </div>
