@@ -2017,14 +2017,32 @@ const handleSaveDeliveryConfig = () => {
                         </div>
 
                         <div className="space-y-2 mb-4">
-                          {order.items.map((item, index) => (
-                            <div key={index} className="flex justify-between">
-                              <span>
-                                {item.quantity}x {item.name}
-                              </span>
-                              <span>R$ {(item.price * item.quantity).toFixed(2)}</span>
-                            </div>
-                          ))}
+                          {order.items.map((item, index) => {
+                            const extrasTotal = item.extras && item.extras.length > 0
+                              ? item.extras.reduce((sum: number, extra: any) => sum + (extra.price || 0), 0)
+                              : 0
+                            const itemTotal = (item.price + extrasTotal) * item.quantity
+                            return (
+                              <div key={index}>
+                                <div className="flex justify-between">
+                                  <span>
+                                    {item.quantity}x {item.name}
+                                  </span>
+                                  <span>R$ {itemTotal.toFixed(2)}</span>
+                                </div>
+                                {item.extras && item.extras.length > 0 && (
+                                  <div className="ml-6 mt-1 space-y-0.5">
+                                    {item.extras.map((extra: any, extraIndex: number) => (
+                                      <div key={extraIndex} className="flex justify-between text-xs text-orange-600">
+                                        <span>+ {extra.name}</span>
+                                        <span>+ R$ {(extra.price || 0).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                           <div className="border-t pt-2 font-bold flex justify-between">
                             <span>Total:</span>
                             <span>R$ {order.total.toFixed(2)}</span>
