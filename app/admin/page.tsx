@@ -237,23 +237,44 @@ export default function AdminPanel() {
 
       const now = ctx.currentTime
 
-      // Som de notificação: 3 bips crescentes
-      const frequencies = [523.25, 659.25, 783.99] // C5, E5, G5
-      const gainNode = ctx.createGain()
-      gainNode.connect(ctx.destination)
-      gainNode.gain.setValueAtTime(0.3, now)
+      // Som de alerta chamativo: padrão urgente que repete 3 vezes
+      const playBurst = (startTime: number) => {
+        const masterGain = ctx.createGain()
+        masterGain.connect(ctx.destination)
+        masterGain.gain.setValueAtTime(0.5, startTime)
 
-      frequencies.forEach((freq, i) => {
-        const oscillator = ctx.createOscillator()
-        oscillator.type = "sine"
-        oscillator.frequency.setValueAtTime(freq, now + i * 0.15)
-        oscillator.connect(gainNode)
-        oscillator.start(now + i * 0.15)
-        oscillator.stop(now + i * 0.15 + 0.12)
-      })
+        // Primeiro tom - agudo e forte
+        const osc1 = ctx.createOscillator()
+        osc1.type = "square"
+        osc1.frequency.setValueAtTime(880, startTime) // A5
+        osc1.connect(masterGain)
+        osc1.start(startTime)
+        osc1.stop(startTime + 0.1)
 
-      gainNode.gain.setValueAtTime(0.3, now + 0.4)
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6)
+        // Segundo tom - mais agudo
+        const osc2 = ctx.createOscillator()
+        osc2.type = "square"
+        osc2.frequency.setValueAtTime(1174.66, startTime + 0.12) // D6
+        osc2.connect(masterGain)
+        osc2.start(startTime + 0.12)
+        osc2.stop(startTime + 0.22)
+
+        // Terceiro tom - pico
+        const osc3 = ctx.createOscillator()
+        osc3.type = "square"
+        osc3.frequency.setValueAtTime(1396.91, startTime + 0.24) // F6
+        osc3.connect(masterGain)
+        osc3.start(startTime + 0.24)
+        osc3.stop(startTime + 0.38)
+
+        masterGain.gain.setValueAtTime(0.5, startTime + 0.38)
+        masterGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5)
+      }
+
+      // Toca o padrão 3 vezes com intervalo
+      playBurst(now)
+      playBurst(now + 0.6)
+      playBurst(now + 1.2)
     } catch (err) {
       console.log("Não foi possível tocar o som:", err)
     }
