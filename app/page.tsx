@@ -608,8 +608,8 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                           </div>
                         </CardHeader>
                         <CardContent className="pt-0 p-2 sm:p-4 mt-auto">
-                          <div className="flex items-center justify-center sm:justify-between gap-1 sm:gap-2">
-                            <div className="flex items-center space-x-1 sm:space-x-2">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-center gap-1 sm:gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -645,11 +645,11 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                                   addToCartWithExtras(item.id, [])
                                 }
                               }}
-                              className="hidden sm:inline-flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap rounded-md text-xs sm:text-sm font-medium transition-all h-8 sm:h-9 px-3 sm:px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 touch-manipulation"
+                              className="hidden sm:flex w-full items-center justify-center gap-2 rounded-md text-sm font-medium transition-all h-9 px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 touch-manipulation"
                               style={{
-                                backgroundColor: "#ea580c !important",
-                                color: "#ffffff !important",
-                                border: "none !important",
+                                backgroundColor: "#ea580c",
+                                color: "#ffffff",
+                                border: "none",
                               }}
                             >
                               Adicionar
