@@ -185,19 +185,35 @@ const transactionTypes = [
 
 export default function AdminPanel() {
   const previousOrdersCountRef = useRef<number>(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const userInteractedRef = useRef(false)
 
+  // Inicializar AudioContext após interação do usuário (necessário para navegadores)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      audioRef.current = new Audio("/notification-sound.mp3")
-      audioRef.current.volume = 0.7
+    if (typeof window === "undefined") return
 
-      // Carregar preferência de som do localStorage
-      const savedSoundPref = localStorage.getItem("soundEnabled")
-      if (savedSoundPref !== null) {
-        setSoundEnabled(JSON.parse(savedSoundPref))
+    const savedSoundPref = localStorage.getItem("soundEnabled")
+    if (savedSoundPref !== null) {
+      setSoundEnabled(JSON.parse(savedSoundPref))
+    }
+
+    const initAudioContext = () => {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
       }
+      if (audioContextRef.current.state === "suspended") {
+        audioContextRef.current.resume()
+      }
+      userInteractedRef.current = true
+    }
+
+    document.addEventListener("click", initAudioContext, { once: false })
+    document.addEventListener("touchstart", initAudioContext, { once: false })
+
+    return () => {
+      document.removeEventListener("click", initAudioContext)
+      document.removeEventListener("touchstart", initAudioContext)
     }
   }, [])
 
@@ -208,11 +224,38 @@ export default function AdminPanel() {
   }, [soundEnabled])
 
   const playNotificationSound = () => {
-    if (soundEnabled && audioRef.current) {
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch((err) => {
-        console.log("Não foi possível tocar o som:", err)
+    if (!soundEnabled) return
+
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      }
+      const ctx = audioContextRef.current
+      if (ctx.state === "suspended") {
+        ctx.resume()
+      }
+
+      const now = ctx.currentTime
+
+      // Som de notificação: 3 bips crescentes
+      const frequencies = [523.25, 659.25, 783.99] // C5, E5, G5
+      const gainNode = ctx.createGain()
+      gainNode.connect(ctx.destination)
+      gainNode.gain.setValueAtTime(0.3, now)
+
+      frequencies.forEach((freq, i) => {
+        const oscillator = ctx.createOscillator()
+        oscillator.type = "sine"
+        oscillator.frequency.setValueAtTime(freq, now + i * 0.15)
+        oscillator.connect(gainNode)
+        oscillator.start(now + i * 0.15)
+        oscillator.stop(now + i * 0.15 + 0.12)
       })
+
+      gainNode.gain.setValueAtTime(0.3, now + 0.4)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6)
+    } catch (err) {
+      console.log("Não foi possível tocar o som:", err)
     }
   }
 
