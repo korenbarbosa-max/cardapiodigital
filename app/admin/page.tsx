@@ -1761,15 +1761,7 @@ const handleSaveDeliveryConfig = () => {
               Voltar ao Cardápio
             </Button>
 
-            <div className="pt-4 border-t text-center">
-              <p className="text-sm text-gray-600">
-                <strong>Credenciais padrão:</strong>
-                <br />
-                Usuário: admin
-                <br />
-                Senha: 123456
-              </p>
-            </div>
+
           </CardContent>
         </Card>
       </div>
