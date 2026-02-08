@@ -473,7 +473,7 @@ export default function AdminPanel() {
           }
         })
 
-        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pending")
+        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pendente")
         if (previousOrdersCountRef.current > 0 && pendingOrders.length > previousOrdersCountRef.current) {
           playNotificationSound()
         }
