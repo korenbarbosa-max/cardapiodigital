@@ -46,6 +46,7 @@ import {
   VolumeX,
 } from "lucide-react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 const DEFAULT_CREDENTIALS = {
@@ -184,6 +185,7 @@ const transactionTypes = [
 ]
 
 export default function AdminPanel() {
+  const [mounted, setMounted] = useState(false)
   const previousOrdersCountRef = useRef<number>(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -312,7 +314,7 @@ export default function AdminPanel() {
   const [loginError, setLoginError] = useState("")
   const [credentialsError, setCredentialsError] = useState("")
 
-  const [categories, setCategories] = useState([])
+  const [categories, setCategories] = useState<any[]>([])
   const [newCategory, setNewCategory] = useState("")
   const [editingCategory, setEditingCategory] = useState<number | null>(null)
   const [editCategoryName, setEditCategoryName] = useState("")
@@ -320,7 +322,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState("dashboard")
 
   const [orders, setOrders] = useState(mockOrders)
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<any[]>([])
   const [newProduct, setNewProduct] = useState({
     name: "",
     category: "",
@@ -663,6 +665,7 @@ export default function AdminPanel() {
 
   // Inicializa os dados ao montar o componente
   useEffect(() => {
+    setMounted(true)
     loadData()
     // loadOrders() already called in loadData
     loadCashTransactions() // Ensure cash transactions are loaded
@@ -990,12 +993,12 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const deleteProduct = async (productId: number) => {
     if (confirm("Tem certeza que deseja deletar este produto?")) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch(`/api/products?id=${productId}`, {
           method: "DELETE",
         })
 
         if (response.ok) {
-          setProducts((prev) => prev.filter((product) => product.id !== productId))
+          setProducts((prev) => prev.filter((product: any) => product.id !== productId))
         }
       } catch (error) {
         console.error("Erro ao deletar produto:", error)
@@ -1004,23 +1007,23 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   }
 
   const toggleProductStatus = async (productId: number) => {
-    const product = products.find((p) => p.id === productId)
+    const product = products.find((p: any) => p.id === productId)
     if (product) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch("/api/products", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...product,
+            id: productId,
             status: product.status === "ativo" ? "inativo" : "ativo",
           }),
         })
 
         if (response.ok) {
           const updatedProduct = await response.json()
-          setProducts((prev) => prev.map((p) => (p.id === productId ? updatedProduct : p)))
+          setProducts((prev: any[]) => prev.map((p: any) => (p.id === productId ? updatedProduct : p)))
         }
       } catch (error) {
         console.error("Erro ao alterar status do produto:", error)
@@ -1730,7 +1733,7 @@ const handleSaveDeliveryConfig = () => {
                 placeholder="Digite seu usuário"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
-                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
             <div>
@@ -1741,7 +1744,7 @@ const handleSaveDeliveryConfig = () => {
                 placeholder="Digite sua senha"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
-                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
 
