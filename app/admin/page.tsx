@@ -750,6 +750,9 @@ export default function AdminPanel() {
   }
 
 const updateOrderStatus = async (orderId: number, newStatus: string) => {
+    // Salva o status anterior para poder reverter em caso de erro
+    const previousOrders = [...orders]
+    
     // Atualiza localmente primeiro para feedback imediato
     setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
     
@@ -765,11 +768,15 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
       
       if (!response.ok) {
         console.error("Erro ao atualizar status do pedido no servidor")
-        // Reverte em caso de erro
-        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: order.status } : order)))
+        // Reverte para o estado anterior em caso de erro
+        setOrders(previousOrders)
+        alert("Erro ao atualizar status do pedido. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro ao atualizar status do pedido:", error)
+      // Reverte para o estado anterior em caso de erro
+      setOrders(previousOrders)
+      alert("Erro ao atualizar status do pedido. Tente novamente.")
     }
   }
 
@@ -817,8 +824,8 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
         })
 
         if (response.ok) {
-          const updatedProduct = await response.json()
-          setProducts((prev) => prev.map((product) => (product.id === editingProduct ? updatedProduct : product)))
+          // Recarrega todos os produtos para garantir dados atualizados com category_name
+          await loadProducts()
           setEditingProduct(null)
           setEditForm({
             name: "",
@@ -835,9 +842,11 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
         } else {
           const errorData = await response.json()
           console.error("Erro ao salvar produto:", errorData)
+          alert("Erro ao salvar produto. Tente novamente.")
         }
       } catch (error) {
         console.error("Erro ao salvar produto:", error)
+        alert("Erro ao salvar produto. Tente novamente.")
       }
     }
   }
@@ -942,8 +951,8 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
         })
 
         if (response.ok) {
-          const createdProduct = await response.json()
-          setProducts((prev) => [...prev, createdProduct])
+          // Recarrega todos os produtos para garantir dados atualizados com category_name
+          await loadProducts()
           setNewProduct({
             name: "",
             category: "",
@@ -990,15 +999,19 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const deleteProduct = async (productId: number) => {
     if (confirm("Tem certeza que deseja deletar este produto?")) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch(`/api/products?id=${productId}`, {
           method: "DELETE",
         })
 
         if (response.ok) {
           setProducts((prev) => prev.filter((product) => product.id !== productId))
+        } else {
+          console.error("Erro ao deletar produto no servidor")
+          alert("Erro ao deletar produto. Tente novamente.")
         }
       } catch (error) {
         console.error("Erro ao deletar produto:", error)
+        alert("Erro ao deletar produto. Tente novamente.")
       }
     }
   }
@@ -1007,23 +1020,27 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
     const product = products.find((p) => p.id === productId)
     if (product) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch("/api/products", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...product,
-            status: product.status === "ativo" ? "inativo" : "ativo",
+            id: productId,
+            visible: !product.visible,
           }),
         })
 
         if (response.ok) {
           const updatedProduct = await response.json()
-          setProducts((prev) => prev.map((p) => (p.id === productId ? updatedProduct : p)))
+          setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...updatedProduct } : p)))
+        } else {
+          console.error("Erro ao alterar visibilidade do produto no servidor")
+          alert("Erro ao alterar visibilidade. Tente novamente.")
         }
       } catch (error) {
-        console.error("Erro ao alterar status do produto:", error)
+        console.error("Erro ao alterar visibilidade do produto:", error)
+        alert("Erro ao alterar visibilidade. Tente novamente.")
       }
     }
   }
