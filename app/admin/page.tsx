@@ -844,7 +844,7 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
 
   const cancelEdit = () => {
     setEditingProduct(null)
-    setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true, extras: [] })
+    setEditForm({ name: "", category: "", price: "", description: "", image: "", visibleInMenu: true, stockControl: false, stockQuantity: 0, perKilo: false, extras: [] })
   }
 
   const convertToBase64 = (file: File): Promise<string> => {
@@ -1672,7 +1672,7 @@ const handleSaveDeliveryConfig = () => {
       setExtras(updatedExtras)
 
       // Salvar no localStorage imediatamente
-      localStorage.setItem("extras", JSON.JSON.stringify(updatedExtras))
+      localStorage.setItem("extras", JSON.stringify(updatedExtras))
     }
   }
 
