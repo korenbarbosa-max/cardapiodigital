@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -46,7 +47,29 @@ import {
   VolumeX,
 } from "lucide-react"
 import Link from "next/link"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+
+// Import Recharts dynamically to avoid SSR issues
+const RechartsChart = dynamic(
+  () => import("recharts").then((mod) => {
+    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = mod
+    // Return a wrapper component
+    function ChartWrapper({ data }: { data: Array<{ name: string; fullName: string; quantity: number }> }) {
+      return (
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={12} />
+            <YAxis />
+            <Tooltip formatter={(value: any, _name: any, props: any) => [`${value} vendidos`, props?.payload?.fullName || '']} />
+            <Bar dataKey="quantity" fill="#f97316" />
+          </BarChart>
+        </ResponsiveContainer>
+      )
+    }
+    return ChartWrapper
+  }),
+  { ssr: false, loading: () => <div className="h-[300px] flex items-center justify-center text-gray-400">Carregando grafico...</div> }
+)
 
 const DEFAULT_CREDENTIALS = {
   username: "admin",
@@ -375,40 +398,16 @@ export default function AdminPanel() {
     transactionType: "todos",
   })
 
-  const [whatsappConfig, setWhatsappConfig] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("whatsappConfig")
-      return saved ? JSON.parse(saved) : { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
-    }
-    return { phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" }
-  })
+  const [whatsappConfig, setWhatsappConfig] = useState({ phone: "", message: "Olá! Gostaria de fazer o seguinte pedido:" })
 
-  const [deliveryConfig, setDeliveryConfig] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("deliveryConfig")
-      return saved ? JSON.parse(saved) : { fee: 0, freeDeliveryMinimum: 0, enabled: true }
-    }
-    return { fee: 0, freeDeliveryMinimum: 0, enabled: true }
-  })
+  const [deliveryConfig, setDeliveryConfig] = useState({ fee: 0, freeDeliveryMinimum: 0, enabled: true })
 
-  const [scheduleConfig, setScheduleConfig] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("scheduleConfig")
-      return saved ? JSON.parse(saved) : {
-        enabled: true,
-        allowPreOrder: true,
-        weekdays: { open: "13:00", close: "22:00", closed: false }, // Segunda a Sexta
-        saturday: { open: "17:00", close: "22:00", closed: false },
-        sunday: { open: "", close: "", closed: true },
-      }
-    }
-    return {
-      enabled: true,
-      allowPreOrder: true,
-      weekdays: { open: "13:00", close: "22:00", closed: false },
-      saturday: { open: "17:00", close: "22:00", closed: false },
-      sunday: { open: "", close: "", closed: true },
-    }
+  const [scheduleConfig, setScheduleConfig] = useState({
+    enabled: true,
+    allowPreOrder: true,
+    weekdays: { open: "13:00", close: "22:00", closed: false },
+    saturday: { open: "17:00", close: "22:00", closed: false },
+    sunday: { open: "", close: "", closed: true },
   })
 
   const [cashBalance, setCashBalance] = useState({
@@ -511,6 +510,7 @@ export default function AdminPanel() {
   }
 
   const loadExtras = () => {
+    if (typeof window === "undefined") return
     const savedExtras = localStorage.getItem("extras")
     if (savedExtras) {
       setExtras(JSON.parse(savedExtras))
@@ -624,14 +624,32 @@ export default function AdminPanel() {
       loadExtras() // Load product-specific extras from localStorage
       // loadGlobalExtras() // Load global extras - temporariamente desabilitado
 
-      const savedCredentials = localStorage.getItem("admin_credentials")
-      if (savedCredentials) {
-        setCredentials(JSON.parse(savedCredentials))
-      }
+      if (typeof window !== "undefined") {
+        const savedCredentials = localStorage.getItem("admin_credentials")
+        if (savedCredentials) {
+          setCredentials(JSON.parse(savedCredentials))
+        }
 
-      const isAuthenticatedFromStorage = localStorage.getItem("admin_authenticated")
-      if (isAuthenticatedFromStorage === "true") {
-        setIsAuthenticated(true)
+        const isAuthenticatedFromStorage = localStorage.getItem("admin_authenticated")
+        if (isAuthenticatedFromStorage === "true") {
+          setIsAuthenticated(true)
+        }
+
+        // Load configs from localStorage
+        const savedWhatsapp = localStorage.getItem("whatsappConfig")
+        if (savedWhatsapp) {
+          setWhatsappConfig(JSON.parse(savedWhatsapp))
+        }
+
+        const savedDelivery = localStorage.getItem("deliveryConfig")
+        if (savedDelivery) {
+          setDeliveryConfig(JSON.parse(savedDelivery))
+        }
+
+        const savedSchedule = localStorage.getItem("scheduleConfig")
+        if (savedSchedule) {
+          setScheduleConfig(JSON.parse(savedSchedule))
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar dados iniciais:", error)
@@ -1699,7 +1717,7 @@ const handleSaveDeliveryConfig = () => {
     window.print()
   }
 
-  if (loading && isAuthenticated) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -1730,7 +1748,7 @@ const handleSaveDeliveryConfig = () => {
                 placeholder="Digite seu usuário"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
-                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
             <div>
@@ -1741,7 +1759,7 @@ const handleSaveDeliveryConfig = () => {
                 placeholder="Digite sua senha"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
-                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </div>
 
@@ -1922,15 +1940,7 @@ const handleSaveDeliveryConfig = () => {
                   <CardDescription>Frequência de vendas por produto</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={productSalesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={12} />
-                      <YAxis />
-                      <Tooltip formatter={(value, name, props) => [`${value} vendidos`, props.payload.fullName]} />
-                      <Bar dataKey="quantity" fill="#f97316" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <RechartsChart data={productSalesData} />
                 </CardContent>
               </Card>
 
