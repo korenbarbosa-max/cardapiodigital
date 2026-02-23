@@ -2,8 +2,56 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Component } from "react"
 import dynamic from "next/dynamic"
+
+// Error Boundary to catch render errors
+class AdminErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("[v0] AdminErrorBoundary caught error:", error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+            <h2 className="text-xl font-bold text-red-600 mb-2">Erro no Painel Admin</h2>
+            <p className="text-gray-600 mb-4">Ocorreu um erro ao carregar o painel administrativo.</p>
+            <pre className="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40 mb-4">
+              {this.state.error?.message}
+              {"\n"}
+              {this.state.error?.stack}
+            </pre>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null })
+                window.location.reload()
+              }}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Recarregar Pagina
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -206,7 +254,15 @@ const transactionTypes = [
   { value: "saida", label: "Saída", icon: TrendingDown, color: "text-red-600" },
 ]
 
-export default function AdminPanel() {
+export default function AdminPage() {
+  return (
+    <AdminErrorBoundary>
+      <AdminPanel />
+    </AdminErrorBoundary>
+  )
+}
+
+function AdminPanel() {
   const previousOrdersCountRef = useRef<number>(0)
   const audioContextRef = useRef<AudioContext | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -1310,9 +1366,37 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
     pendingOrders: orders.filter((order) => order.status === "pendente").length,
   }
 
-  const cashSummary = getCashSummary()
-  const filteredCashSummary = getFilteredCashSummary()
-  const productSalesData = getProductSalesData()
+  let cashSummary: ReturnType<typeof getCashSummary>
+  let filteredCashSummary: ReturnType<typeof getFilteredCashSummary>
+  let productSalesData: ReturnType<typeof getProductSalesData>
+
+  try {
+    cashSummary = getCashSummary()
+  } catch (e) {
+    console.log("[v0] getCashSummary error:", e)
+    cashSummary = { total: 0, entradas: 0, saidas: 0, byPaymentMethod: {} }
+  }
+
+  try {
+    filteredCashSummary = getFilteredCashSummary()
+  } catch (e) {
+    console.log("[v0] getFilteredCashSummary error:", e)
+    filteredCashSummary = { total: 0, entradas: 0, saidas: 0, byPaymentMethod: {}, transactionCount: 0, automaticCount: 0, manualCount: 0 }
+  }
+
+  try {
+    productSalesData = getProductSalesData()
+  } catch (e) {
+    console.log("[v0] getProductSalesData error:", e)
+    productSalesData = []
+  }
+
+  console.log("[v0] stats:", stats)
+  console.log("[v0] productSalesData:", productSalesData)
+  console.log("[v0] isAuthenticated:", isAuthenticated)
+  console.log("[v0] loading:", loading)
+  console.log("[v0] orders count:", orders.length)
+  console.log("[v0] products count:", products.length)
 
   const updateStock = (
     productId: number,
@@ -1924,10 +2008,10 @@ const handleSaveDeliveryConfig = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl sm:text-2xl font-bold">
-                    {products.filter((p) => p.status === "ativo").length}
+                    {products.filter((p: any) => p.visible !== false).length}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {products.filter((p) => p.status === "inativo").length} inativos
+                    {products.filter((p: any) => p.visible === false).length} inativos
                   </p>
                 </CardContent>
               </Card>
@@ -1963,11 +2047,11 @@ const handleSaveDeliveryConfig = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-orange-500 h-2 rounded-full"
                               style={{
-                                width: `${(product.quantity / Math.max(...productSalesData.map((p) => p.quantity))) * 100}%`,
+                                width: `${productSalesData.length > 0 ? (product.quantity / Math.max(...productSalesData.map((p) => p.quantity), 1)) * 100 : 0}%`,
                               }}
                             ></div>
                           </div>
@@ -3406,21 +3490,21 @@ const handleSaveDeliveryConfig = () => {
                         R${" "}
                         {cashTransactions
                           .filter((t) => t.type === "entrada")
-                          .reduce((acc, t) => acc + t.amount, 0)
+                          .reduce((acc, t) => acc + Number(t.amount), 0)
                           .toFixed(2)}
                       </div>
                     </div>
 
                     <div className="p-4 border rounded-lg bg-red-50">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-red-700">Total Saídas</span>
+                        <span className="text-sm text-red-700">Total Saidas</span>
                         <TrendingDown className="w-4 h-4 text-red-600" />
                       </div>
                       <div className="text-2xl font-bold text-red-700">
                         R${" "}
                         {cashTransactions
                           .filter((t) => t.type === "saida")
-                          .reduce((acc, t) => acc + t.amount, 0)
+                          .reduce((acc, t) => acc + Number(t.amount), 0)
                           .toFixed(2)}
                       </div>
                     </div>
@@ -3433,8 +3517,8 @@ const handleSaveDeliveryConfig = () => {
                       <div className="text-2xl font-bold text-blue-700">
                         R${" "}
                         {(
-                          cashTransactions.filter((t) => t.type === "entrada").reduce((acc, t) => acc + t.amount, 0) -
-                          cashTransactions.filter((t) => t.type === "saida").reduce((acc, t) => acc + t.amount, 0)
+                          cashTransactions.filter((t) => t.type === "entrada").reduce((acc, t) => acc + Number(t.amount), 0) -
+                          cashTransactions.filter((t) => t.type === "saida").reduce((acc, t) => acc + Number(t.amount), 0)
                         ).toFixed(2)}
                       </div>
                     </div>
@@ -3467,7 +3551,7 @@ const handleSaveDeliveryConfig = () => {
                                   transaction.type === "entrada" ? "text-green-600" : "text-red-600"
                                 }`}
                               >
-                                {transaction.type === "entrada" ? "+" : "-"} R$ {transaction.amount.toFixed(2)}
+                                {transaction.type === "entrada" ? "+" : "-"} R$ {Number(transaction.amount).toFixed(2)}
                               </td>
                             </tr>
                           ))}
