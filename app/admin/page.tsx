@@ -509,11 +509,20 @@ export default function AdminPanel() {
     }
   }
 
-  const loadExtras = () => {
-    if (typeof window === "undefined") return
-    const savedExtras = localStorage.getItem("extras")
-    if (savedExtras) {
-      setExtras(JSON.parse(savedExtras))
+  const loadExtras = async () => {
+    try {
+      const response = await fetch("/api/extras")
+      if (response.ok) {
+        const data = await response.json()
+        const mapped = data.map((e: any) => ({
+          id: String(e.id),
+          name: e.name,
+          price: e.price,
+        }))
+        setExtras(mapped)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar acréscimos:", error)
     }
   }
 
@@ -532,6 +541,23 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error("Erro ao carregar acréscimos:", error)
+    }
+  }
+
+  const loadStockMovements = async () => {
+    try {
+      const response = await fetch("/api/stock-movements")
+      if (response.ok) {
+        const data = await response.json()
+        const mapped = data.map((m: any) => ({
+          ...m,
+          productId: m.product_id,
+          productName: products.find((p: any) => p.id === m.product_id)?.name || "Produto removido",
+        }))
+        setStockMovements(mapped)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar movimentações:", error)
     }
   }
 
@@ -615,8 +641,8 @@ export default function AdminPanel() {
       await loadCategories()
       await loadOrders() // Ensure orders are loaded initially
 
-      loadExtras() // Load product-specific extras from localStorage
-      await loadGlobalExtras() // Load global extras from database
+      await loadExtras() // Load extras from database
+      await loadStockMovements() // Load stock movements from database
 
       if (typeof window !== "undefined") {
         const savedCredentials = localStorage.getItem("admin_credentials")
@@ -678,7 +704,6 @@ export default function AdminPanel() {
     loadData()
     // loadOrders() already called in loadData
     loadCashTransactions() // Ensure cash transactions are loaded
-    loadExtras()
 
     if (typeof window !== "undefined") {
       const savedSession = localStorage.getItem("cashSession")
@@ -1129,19 +1154,25 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
 
       if (!response.ok) throw new Error("Erro ao atualizar estoque")
 
-      // Registrar movimentação
-      const movement = {
-        id: Date.now(),
-        productId: Number(stockMovement.productId),
-        productName: product.name,
-        type: stockMovementType,
-        quantity,
-        unit: "unidade",
-        reason: stockMovement.reason,
-        date: new Date().toLocaleString("pt-BR"),
-        user: "Admin",
+      // Registrar movimentação no banco de dados
+      const movementResponse = await fetch("/api/stock-movements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: Number(stockMovement.productId),
+          type: stockMovementType,
+          quantity,
+          reason: stockMovement.reason,
+        }),
+      })
+
+      if (movementResponse.ok) {
+        const savedMovement = await movementResponse.json()
+        setStockMovements((prev) => [{
+          ...savedMovement,
+          productName: product.name,
+        }, ...prev])
       }
-      setStockMovements((prev) => [movement, ...prev])
 
       // Atualizar lista de produtos
       await loadProducts()
@@ -1373,19 +1404,25 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
       const oldStock = product.stock_quantity || 0
       const difference = newStock - oldStock
 
-      // Registrar movimentação de balanço
-      const movement = {
-        id: Date.now(),
-        productId,
-        productName: product.name,
-        type: "ajuste",
-        quantity: Math.abs(difference),
-        unit: "unidade",
-        reason: `Ajuste: ${reason} (${oldStock} → ${newStock})`,
-        date: new Date().toLocaleString("pt-BR"),
-        user: "Admin",
+      // Registrar movimentação de balanço no banco de dados
+      const movementResponse = await fetch("/api/stock-movements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: productId,
+          type: "ajuste",
+          quantity: Math.abs(difference),
+          reason: `Ajuste: ${reason} (${oldStock} → ${newStock})`,
+        }),
+      })
+
+      if (movementResponse.ok) {
+        const savedMovement = await movementResponse.json()
+        setStockMovements((prev) => [{
+          ...savedMovement,
+          productName: product.name,
+        }, ...prev])
       }
-      setStockMovements((prev) => [movement, ...prev])
 
       await loadProducts()
       alert("Estoque ajustado com sucesso!")
@@ -1634,37 +1671,56 @@ const handleSaveDeliveryConfig = () => {
     }
   }
 
-  const addExtra = () => {
+  const addExtra = async () => {
     if (extraForm.name && extraForm.price) {
-      const newExtra = {
-        id: Date.now().toString(),
-        name: extraForm.name,
-        price: Number.parseFloat(extraForm.price),
+      try {
+        const response = await fetch("/api/extras", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: extraForm.name,
+            price: Number.parseFloat(extraForm.price),
+            active: true,
+          }),
+        })
+
+        if (response.ok) {
+          await loadExtras()
+          setExtraForm({ name: "", price: "" })
+        } else {
+          alert("Erro ao adicionar acréscimo")
+        }
+      } catch (error) {
+        console.error("Erro ao adicionar acréscimo:", error)
+        alert("Erro ao adicionar acréscimo")
       }
-
-      const updatedExtras = [...extras, newExtra]
-      setExtras(updatedExtras)
-      setExtraForm({ name: "", price: "" })
-
-      // Salvar no localStorage imediatamente
-      localStorage.setItem("extras", JSON.stringify(updatedExtras))
     }
   }
 
-  const saveEditExtra = () => {
+  const saveEditExtra = async () => {
     if (editingExtra && extraForm.name && extraForm.price) {
-      const updatedExtras = extras.map((extra) =>
-        extra.id === editingExtra
-          ? { ...extra, name: extraForm.name, price: Number.parseFloat(extraForm.price) }
-          : extra,
-      )
+      try {
+        const response = await fetch("/api/extras", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: Number(editingExtra),
+            name: extraForm.name,
+            price: Number.parseFloat(extraForm.price),
+          }),
+        })
 
-      setExtras(updatedExtras)
-      setEditingExtra(null)
-      setExtraForm({ name: "", price: "" })
-
-      // Salvar no localStorage imediatamente
-      localStorage.setItem("extras", JSON.stringify(updatedExtras))
+        if (response.ok) {
+          await loadExtras()
+          setEditingExtra(null)
+          setExtraForm({ name: "", price: "" })
+        } else {
+          alert("Erro ao atualizar acréscimo")
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar acréscimo:", error)
+        alert("Erro ao atualizar acréscimo")
+      }
     }
   }
 
@@ -1678,13 +1734,22 @@ const handleSaveDeliveryConfig = () => {
     setExtraForm({ name: extra.name, price: extra.price.toString() })
   }
 
-  const deleteExtra = (extraId: string) => {
+  const deleteExtra = async (extraId: string) => {
     if (confirm("Tem certeza que deseja excluir este acréscimo?")) {
-      const updatedExtras = extras.filter((extra) => extra.id !== extraId)
-      setExtras(updatedExtras)
+      try {
+        const response = await fetch(`/api/extras?id=${extraId}`, {
+          method: "DELETE",
+        })
 
-      // Salvar no localStorage imediatamente
-      localStorage.setItem("extras", JSON.stringify(updatedExtras))
+        if (response.ok) {
+          await loadExtras()
+        } else {
+          alert("Erro ao excluir acréscimo")
+        }
+      } catch (error) {
+        console.error("Erro ao excluir acréscimo:", error)
+        alert("Erro ao excluir acréscimo")
+      }
     }
   }
 
@@ -2900,7 +2965,7 @@ const handleSaveDeliveryConfig = () => {
                           {stockMovements.map((movement) => (
                             <tr key={movement.id}>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                {products.find((p) => p.id === movement.productId)?.name}
+                                {movement.productName || products.find((p) => p.id === movement.product_id)?.name || "—"}
                               </td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                 <Badge
@@ -2924,7 +2989,7 @@ const handleSaveDeliveryConfig = () => {
                               </td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">{movement.reason}</td>
                               <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                {new Date(movement.date).toLocaleDateString()}
+                                {movement.created_at ? new Date(movement.created_at).toLocaleString("pt-BR") : movement.date}
                               </td>
                             </tr>
                           ))}

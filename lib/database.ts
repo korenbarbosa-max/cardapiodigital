@@ -348,3 +348,54 @@ export async function deleteExtra(id: number): Promise<void> {
 
   if (error) throw error
 }
+
+// Funções para Movimentações de Estoque
+export interface StockMovement {
+  id?: number
+  product_id: number
+  type: "entrada" | "saida" | "ajuste"
+  quantity: number
+  reason: string
+  created_at?: string
+}
+
+export async function getStockMovements(): Promise<StockMovement[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from("stock_movements").select("*").order("created_at", { ascending: false })
+
+  if (error) throw error
+  return data as StockMovement[]
+}
+
+export async function createStockMovement(
+  movement: Omit<StockMovement, "id" | "created_at">,
+): Promise<StockMovement> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("stock_movements")
+    .insert({
+      product_id: movement.product_id,
+      type: movement.type,
+      quantity: movement.quantity,
+      reason: movement.reason,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data as StockMovement
+}
+
+// Funções para Pedidos com filtro de data
+export async function getOrdersByDate(startDate: string, endDate: string): Promise<Order[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .gte("created_at", `${startDate}T00:00:00`)
+    .lte("created_at", `${endDate}T23:59:59`)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+  return data as Order[]
+}

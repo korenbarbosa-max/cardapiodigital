@@ -1,9 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getOrders, createOrder, updateOrderStatus } from "@/lib/database"
+import { getOrders, getOrdersByDate, createOrder, updateOrderStatus } from "@/lib/database"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const orders = await getOrders()
+    const { searchParams } = new URL(request.url)
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
+
+    let orders
+    if (startDate && endDate) {
+      orders = await getOrdersByDate(startDate, endDate)
+    } else {
+      orders = await getOrders()
+    }
     return NextResponse.json(orders)
   } catch (error) {
     console.error("Error fetching orders:", error)
