@@ -517,28 +517,22 @@ export default function AdminPanel() {
     }
   }
 
-  // Global extras functions (kept for now, but might need refactoring if they overlap with `extras`)
+  // Global extras functions
   const loadGlobalExtras = async () => {
-    // Temporariamente desabilitado - aguardando criação da tabela extras no Supabase
-    // Para usar acréscimos agora, use a aba "Acréscimos" que salva no localStorage
-    console.log("Sistema de acréscimos usando localStorage temporariamente")
-    /*
     try {
       const response = await fetch("/api/extras")
       if (response.ok) {
         const data = await response.json()
-        // Assuming the API returns an array of extras
-        // setNewExtraGlobal should be replaced with a state that holds an array
-        // For now, commenting out the incorrect assignment
-        // setNewExtraGlobal(data)
-      } else if (response.status === 404) {
-        // Table doesn't exist yet, silently ignore
-        console.log("Tabela extras ainda não foi criada no banco de dados")
+        const mapped = data.map((e: any) => ({
+          id: String(e.id),
+          name: e.name,
+          price: e.price,
+        }))
+        setExtras(mapped)
       }
     } catch (error) {
-      console.log("Aguardando criação da tabela extras no banco de dados")
+      console.error("Erro ao carregar acréscimos:", error)
     }
-    */
   }
 
   const addExtraGlobal = async () => {
@@ -622,7 +616,7 @@ export default function AdminPanel() {
       await loadOrders() // Ensure orders are loaded initially
 
       loadExtras() // Load product-specific extras from localStorage
-      // loadGlobalExtras() // Load global extras - temporariamente desabilitado
+      await loadGlobalExtras() // Load global extras from database
 
       if (typeof window !== "undefined") {
         const savedCredentials = localStorage.getItem("admin_credentials")
@@ -1008,7 +1002,7 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const deleteProduct = async (productId: number) => {
     if (confirm("Tem certeza que deseja deletar este produto?")) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch(`/api/products?id=${productId}`, {
           method: "DELETE",
         })
 
@@ -1025,14 +1019,14 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
     const product = products.find((p) => p.id === productId)
     if (product) {
       try {
-        const response = await fetch(`/api/products/${productId}`, {
+        const response = await fetch("/api/products", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            ...product,
-            status: product.status === "ativo" ? "inativo" : "ativo",
+            id: productId,
+            visible: !product.visible,
           }),
         })
 
