@@ -250,6 +250,13 @@ export async function updateOrderStatus(id: number, status: string): Promise<Ord
   return data as Order
 }
 
+export async function deleteOrder(id: number): Promise<void> {
+  const supabase = await createClient()
+  const { error } = await supabase.from("orders").delete().eq("id", id)
+
+  if (error) throw error
+}
+
 // Funções para Transações de Caixa
 export async function getCashTransactions(): Promise<CashTransaction[]> {
   const supabase = await createClient()
