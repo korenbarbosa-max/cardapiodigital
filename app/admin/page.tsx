@@ -45,6 +45,8 @@ import {
   Trash,
   Volume2,
   VolumeX,
+  Calendar,
+  Filter,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -88,6 +90,7 @@ const mockOrders = [
     total: 63.7,
     status: "pendente",
     timestamp: "14:30",
+    date: new Date().toISOString().split("T")[0],
   },
   {
     id: 2,
@@ -99,6 +102,7 @@ const mockOrders = [
     total: 69.8,
     status: "preparando",
     timestamp: "14:25",
+    date: new Date().toISOString().split("T")[0],
   },
 ]
 
@@ -391,6 +395,15 @@ export default function AdminPanel() {
     description: "",
   })
 
+  const [orderDateFilter, setOrderDateFilter] = useState(new Date().toISOString().split("T")[0])
+  const [orderFilterActive, setOrderFilterActive] = useState(false)
+
+  const [dashboardDateFilter, setDashboardDateFilter] = useState(new Date().toISOString().split("T")[0])
+  const [dashboardFilterActive, setDashboardFilterActive] = useState(true)
+
+  const [reportOrderDateFilter, setReportOrderDateFilter] = useState(new Date().toISOString().split("T")[0])
+  const [reportOrderFilterActive, setReportOrderFilterActive] = useState(false)
+
   const [reportFilters, setReportFilters] = useState({
     startDate: new Date().toISOString().split("T")[0], // Data atual
     endDate: new Date().toISOString().split("T")[0], // Data atual
@@ -483,6 +496,7 @@ export default function AdminPanel() {
             total: order.total,
             status: order.status,
             timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            date: orderDate.toISOString().split("T")[0],
             customer: {
               name: order.customer_name || "",
               phone: order.customer_phone || "",
@@ -1300,8 +1314,8 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const getProductSalesData = () => {
     const productSales: { [key: string]: number } = {}
 
-    // Contar vendas de cada produto nos pedidos
-    orders.forEach((order) => {
+    // Contar vendas de cada produto nos pedidos (usando pedidos filtrados do dashboard)
+    dashboardOrders.forEach((order) => {
       order.items.forEach((item) => {
         if (productSales[item.name]) {
           productSales[item.name] += item.quantity
@@ -1322,10 +1336,25 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
       .slice(0, 8) // Top 8 produtos
   }
 
+  // Pedidos filtrados por data (para aba Pedidos)
+  const filteredOrders = orderFilterActive
+    ? orders.filter((order) => order.date === orderDateFilter)
+    : orders
+
+  // Pedidos filtrados por data (para dashboard)
+  const dashboardOrders = dashboardFilterActive
+    ? orders.filter((order) => order.date === dashboardDateFilter)
+    : orders
+
+  // Pedidos filtrados por data (para relatorios)
+  const reportOrders = reportOrderFilterActive
+    ? orders.filter((order) => order.date === reportOrderDateFilter)
+    : orders
+
   const stats = {
-    totalOrders: orders.length,
-    totalRevenue: orders.reduce((sum, order) => sum + order.total, 0),
-    pendingOrders: orders.filter((order) => order.status === "pendente").length,
+    totalOrders: dashboardOrders.length,
+    totalRevenue: dashboardOrders.reduce((sum, order) => sum + order.total, 0),
+    pendingOrders: dashboardOrders.filter((order) => order.status === "pendente").length,
   }
 
   const cashSummary = getCashSummary()
@@ -1912,10 +1941,49 @@ const handleSaveDeliveryConfig = () => {
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filtrar por data:</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  type="date"
+                  value={dashboardDateFilter}
+                  onChange={(e) => setDashboardDateFilter(e.target.value)}
+                  className="w-auto h-9 text-sm"
+                />
+                <Button
+                  variant={dashboardFilterActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDashboardFilterActive(!dashboardFilterActive)}
+                >
+                  <Filter className="w-3.5 h-3.5 mr-1.5" />
+                  {dashboardFilterActive ? "Filtro ativo" : "Filtrar"}
+                </Button>
+                {dashboardFilterActive && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDashboardDateFilter(new Date().toISOString().split("T")[0])
+                    }}
+                  >
+                    Hoje
+                  </Button>
+                )}
+                {!dashboardFilterActive && (
+                  <span className="text-xs text-muted-foreground">Mostrando todos os pedidos</span>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xs sm:text-sm font-medium">Pedidos Hoje</CardTitle>
+                  <CardTitle className="text-xs sm:text-sm font-medium">
+                    {dashboardFilterActive ? "Pedidos" : "Pedidos (Todos)"}
+                  </CardTitle>
                   <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -1931,7 +1999,11 @@ const handleSaveDeliveryConfig = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-xl sm:text-2xl font-bold">R$ {stats.totalRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Hoje</p>
+                  <p className="text-xs text-muted-foreground">
+                    {dashboardFilterActive
+                      ? new Date(dashboardDateFilter + "T12:00:00").toLocaleDateString("pt-BR")
+                      : "Todos"}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -2003,7 +2075,7 @@ const handleSaveDeliveryConfig = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orders.slice(0, 3).map((order) => (
+                  {dashboardOrders.slice(0, 3).map((order) => (
                     <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">
@@ -2030,12 +2102,65 @@ const handleSaveDeliveryConfig = () => {
           <TabsContent value="orders">
             <Card>
               <CardHeader>
-                <CardTitle>Gerenciar Pedidos</CardTitle>
-                <CardDescription>Visualize e gerencie todos os pedidos em tempo real</CardDescription>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <CardTitle>Gerenciar Pedidos</CardTitle>
+                    <CardDescription>Visualize e gerencie todos os pedidos em tempo real</CardDescription>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Filtrar:</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Input
+                        type="date"
+                        value={orderDateFilter}
+                        onChange={(e) => setOrderDateFilter(e.target.value)}
+                        className="w-auto h-9 text-sm"
+                      />
+                      <Button
+                        variant={orderFilterActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setOrderFilterActive(!orderFilterActive)}
+                      >
+                        <Filter className="w-3.5 h-3.5 mr-1.5" />
+                        {orderFilterActive ? "Filtro ativo" : "Filtrar por data"}
+                      </Button>
+                      {orderFilterActive && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setOrderDateFilter(new Date().toISOString().split("T")[0])
+                          }}
+                        >
+                          Hoje
+                        </Button>
+                      )}
+                    </div>
+                    {orderFilterActive && (
+                      <span className="text-xs text-muted-foreground">
+                        {filteredOrders.length} pedido(s) em {new Date(orderDateFilter + "T12:00:00").toLocaleDateString("pt-BR")}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
+                {filteredOrders.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-lg font-medium">Nenhum pedido encontrado</p>
+                    <p className="text-sm">
+                      {orderFilterActive
+                        ? `Nenhum pedido para ${new Date(orderDateFilter + "T12:00:00").toLocaleDateString("pt-BR")}`
+                        : "Ainda nao ha pedidos registrados"}
+                    </p>
+                  </div>
+                ) : (
                 <div className="space-y-4">
-                  {orders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <Card key={order.id}>
                       <CardHeader>
                         <div className="flex justify-between items-center">
@@ -2171,6 +2296,7 @@ const handleSaveDeliveryConfig = () => {
                     </Card>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -3343,8 +3469,50 @@ const handleSaveDeliveryConfig = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Relatório de Vendas</CardTitle>
-                  <CardDescription>Análise detalhada das vendas e faturamento</CardDescription>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <CardTitle>Relatório de Vendas</CardTitle>
+                      <CardDescription>Análise detalhada das vendas e faturamento</CardDescription>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Filtrar pedidos:</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Input
+                          type="date"
+                          value={reportOrderDateFilter}
+                          onChange={(e) => setReportOrderDateFilter(e.target.value)}
+                          className="w-auto h-9 text-sm"
+                        />
+                        <Button
+                          variant={reportOrderFilterActive ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setReportOrderFilterActive(!reportOrderFilterActive)}
+                        >
+                          <Filter className="w-3.5 h-3.5 mr-1.5" />
+                          {reportOrderFilterActive ? "Filtro ativo" : "Filtrar por data"}
+                        </Button>
+                        {reportOrderFilterActive && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setReportOrderDateFilter(new Date().toISOString().split("T")[0])
+                            }}
+                          >
+                            Hoje
+                          </Button>
+                        )}
+                        {reportOrderFilterActive && (
+                          <span className="text-xs text-muted-foreground">
+                            {reportOrders.length} pedido(s) em {new Date(reportOrderDateFilter + "T12:00:00").toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -3353,9 +3521,9 @@ const handleSaveDeliveryConfig = () => {
                         <span className="text-sm text-gray-600">Total de Pedidos</span>
                         <ShoppingBag className="w-4 h-4 text-gray-400" />
                       </div>
-                      <div className="text-2xl font-bold">{orders.length}</div>
+                      <div className="text-2xl font-bold">{reportOrders.length}</div>
                       <p className="text-xs text-gray-500">
-                        {orders.filter((o) => o.status === "pendente").length} pendentes
+                        {reportOrders.filter((o) => o.status === "pendente").length} pendentes
                       </p>
                     </div>
 
@@ -3365,9 +3533,13 @@ const handleSaveDeliveryConfig = () => {
                         <DollarSign className="w-4 h-4 text-gray-400" />
                       </div>
                       <div className="text-2xl font-bold">
-                        R$ {orders.reduce((acc, order) => acc + order.total, 0).toFixed(2)}
+                        R$ {reportOrders.reduce((acc, order) => acc + order.total, 0).toFixed(2)}
                       </div>
-                      <p className="text-xs text-gray-500">Todos os pedidos</p>
+                      <p className="text-xs text-gray-500">
+                        {reportOrderFilterActive
+                          ? new Date(reportOrderDateFilter + "T12:00:00").toLocaleDateString("pt-BR")
+                          : "Todos os pedidos"}
+                      </p>
                     </div>
 
                     <div className="p-4 border rounded-lg">
@@ -3377,8 +3549,8 @@ const handleSaveDeliveryConfig = () => {
                       </div>
                       <div className="text-2xl font-bold">
                         R${" "}
-                        {orders.length > 0
-                          ? (orders.reduce((acc, order) => acc + order.total, 0) / orders.length).toFixed(2)
+                        {reportOrders.length > 0
+                          ? (reportOrders.reduce((acc, order) => acc + order.total, 0) / reportOrders.length).toFixed(2)
                           : "0.00"}
                       </div>
                       <p className="text-xs text-gray-500">Por pedido</p>
