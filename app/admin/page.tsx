@@ -785,6 +785,30 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
     }
   }
 
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!confirm(`Tem certeza que deseja excluir o pedido #${orderId}? Esta ação não pode ser desfeita.`)) return
+
+    // Remove localmente para feedback imediato
+    setOrders((prev) => prev.filter((order) => order.id !== orderId))
+
+    try {
+      const response = await fetch(`/api/orders?id=${orderId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        console.error("Erro ao excluir pedido no servidor")
+        // Reverte em caso de erro recarregando os pedidos
+        await loadOrders()
+        alert("Erro ao excluir pedido. Tente novamente.")
+      }
+    } catch (error) {
+      console.error("Erro ao excluir pedido:", error)
+      await loadOrders()
+      alert("Erro ao excluir pedido. Tente novamente.")
+    }
+  }
+
   const printOrder = (orderId: number) => {
     // Simular impressão
     alert(`Imprimindo pedido #${orderId}`)
@@ -2035,6 +2059,14 @@ const handleSaveDeliveryConfig = () => {
                             </Badge>
                             <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
                               <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                              onClick={() => handleDeleteOrder(order.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
