@@ -45,6 +45,9 @@ import {
   Trash,
   Volume2,
   VolumeX,
+  UtensilsCrossed,
+  Clock,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -441,6 +444,21 @@ export default function AdminPanel() {
 
   const [loading, setLoading] = useState(true)
 
+  // Estados para comandas de mesas
+  const [tableTabs, setTableTabs] = useState<Array<{
+    id: number
+    table_number: number
+    status: 'available' | 'occupied' | 'pending_payment'
+    items: Array<{ id: number; name: string; price: number; quantity: number; extras?: Array<{ name: string; price: number }> }>
+    total: number
+    customer_name: string | null
+    opened_at: string | null
+    closed_at: string | null
+  }>>([])
+  const [selectedTable, setSelectedTable] = useState<number | null>(null)
+  const [tableCustomerName, setTableCustomerName] = useState("")
+  const [addingItemToTable, setAddingItemToTable] = useState(false)
+
   const loadProducts = async () => {
     try {
       const productsResponse = await fetch("/api/products")
@@ -608,12 +626,25 @@ export default function AdminPanel() {
     }
   }
 
+  const loadTableTabs = async () => {
+    try {
+      const response = await fetch("/api/table-tabs")
+      if (response.ok) {
+        const data = await response.json()
+        setTableTabs(data)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar comandas:", error)
+    }
+  }
+
   const loadData = async () => {
     try {
       setLoading(true)
       await loadProducts()
       await loadCategories()
       await loadOrders() // Ensure orders are loaded initially
+      await loadTableTabs() // Load table tabs
 
       loadExtras() // Load product-specific extras from localStorage
       await loadGlobalExtras() // Load global extras from database
@@ -1570,6 +1601,197 @@ Confirma o fechamento?
     updateOrderStatus(order.id, "processado")
   }
 
+  // Funções para Comandas de Mesas
+  const openTable = async (tableId: number) => {
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          status: "occupied",
+          customer_name: tableCustomerName || null,
+          openTable: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+        setTableCustomerName("")
+        setSelectedTable(tableId)
+      }
+    } catch (error) {
+      console.error("Erro ao abrir mesa:", error)
+    }
+  }
+
+  const closeTable = async (tableId: number) => {
+    const table = tableTabs.find(t => t.id === tableId)
+    if (!table) return
+
+    if (table.items.length > 0 && table.total > 0) {
+      if (!confirm(`Tem certeza que deseja fechar a Mesa ${table.table_number}?\n\nTotal: R$ ${table.total.toFixed(2)}`)) {
+        return
+      }
+    }
+
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          status: "available",
+          closeTable: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+        setSelectedTable(null)
+      }
+    } catch (error) {
+      console.error("Erro ao fechar mesa:", error)
+    }
+  }
+
+  const addItemToTable = async (tableId: number, product: any, quantity: number = 1) => {
+    const table = tableTabs.find(t => t.id === tableId)
+    if (!table) return
+
+    const existingItemIndex = table.items.findIndex(item => item.id === product.id)
+    let newItems = [...table.items]
+    
+    if (existingItemIndex >= 0) {
+      newItems[existingItemIndex] = {
+        ...newItems[existingItemIndex],
+        quantity: newItems[existingItemIndex].quantity + quantity
+      }
+    } else {
+      newItems.push({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity,
+      })
+    }
+
+    const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          items: newItems,
+          total: newTotal,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar item:", error)
+    }
+  }
+
+  const removeItemFromTable = async (tableId: number, productId: number) => {
+    const table = tableTabs.find(t => t.id === tableId)
+    if (!table) return
+
+    const newItems = table.items.filter(item => item.id !== productId)
+    const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          items: newItems,
+          total: newTotal,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+      }
+    } catch (error) {
+      console.error("Erro ao remover item:", error)
+    }
+  }
+
+  const updateItemQuantity = async (tableId: number, productId: number, newQuantity: number) => {
+    const table = tableTabs.find(t => t.id === tableId)
+    if (!table) return
+
+    if (newQuantity <= 0) {
+      return removeItemFromTable(tableId, productId)
+    }
+
+    const newItems = table.items.map(item => 
+      item.id === productId ? { ...item, quantity: newQuantity } : item
+    )
+    const newTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          items: newItems,
+          total: newTotal,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar quantidade:", error)
+    }
+  }
+
+  const markTableForPayment = async (tableId: number) => {
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          status: "pending_payment",
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+      }
+    } catch (error) {
+      console.error("Erro ao marcar para pagamento:", error)
+    }
+  }
+
+  const getTableStatusColor = (status: string) => {
+    switch (status) {
+      case 'available': return 'bg-green-100 text-green-800 border-green-300'
+      case 'occupied': return 'bg-blue-100 text-blue-800 border-blue-300'
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+      default: return 'bg-gray-100 text-gray-800 border-gray-300'
+    }
+  }
+
+  const getTableStatusLabel = (status: string) => {
+    switch (status) {
+      case 'available': return 'Disponível'
+      case 'occupied': return 'Ocupada'
+      case 'pending_payment': return 'Aguardando Pagamento'
+      default: return status
+    }
+  }
+
   const handleSaveWhatsappConfig = () => {
     if (!whatsappConfig.phone) {
       alert("Por favor, insira o número do WhatsApp")
@@ -1849,7 +2071,7 @@ const handleSaveDeliveryConfig = () => {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* <TabsList className="w-full flex overflow-x-auto scrollbar-hide gap-1 h-auto p-1"> */}
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-1 h-auto p-1">
             <TabsTrigger
               value="dashboard"
               className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
@@ -1899,6 +2121,14 @@ const handleSaveDeliveryConfig = () => {
               <FileText className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
               <span className="hidden sm:inline">Relatórios</span>
               <span className="sm:hidden">Rel.</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="tables"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <UtensilsCrossed className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Comandas</span>
+              <span className="sm:hidden">Mesas</span>
             </TabsTrigger>
             <TabsTrigger
               value="settings"
@@ -3554,6 +3784,294 @@ const handleSaveDeliveryConfig = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          {/* Comandas de Mesas */}
+          <TabsContent value="tables">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Visão Geral das Mesas */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UtensilsCrossed className="w-5 h-5" />
+                      Comandas de Mesas
+                    </CardTitle>
+                    <CardDescription>Gerencie as 8 mesas do restaurante</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {tableTabs.map((table) => (
+                        <div
+                          key={table.id}
+                          onClick={() => setSelectedTable(table.id)}
+                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                            selectedTable === table.id ? 'ring-2 ring-blue-500' : ''
+                          } ${getTableStatusColor(table.status)}`}
+                        >
+                          <div className="text-center">
+                            <div className="text-2xl font-bold mb-1">
+                              {table.table_number}
+                            </div>
+                            <Badge variant="outline" className={getTableStatusColor(table.status)}>
+                              {getTableStatusLabel(table.status)}
+                            </Badge>
+                            {table.status !== 'available' && (
+                              <div className="mt-2 text-sm">
+                                <p className="font-medium">R$ {Number(table.total || 0).toFixed(2)}</p>
+                                <p className="text-xs opacity-75">
+                                  {table.items?.length || 0} itens
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Legenda */}
+                    <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-green-100 border border-green-300"></div>
+                        <span className="text-sm">Disponível</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-blue-100 border border-blue-300"></div>
+                        <span className="text-sm">Ocupada</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-yellow-100 border border-yellow-300"></div>
+                        <span className="text-sm">Aguardando Pagamento</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Detalhes da Mesa Selecionada */}
+                {selectedTable && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle>
+                            Mesa {tableTabs.find(t => t.id === selectedTable)?.table_number}
+                          </CardTitle>
+                          <CardDescription>
+                            {tableTabs.find(t => t.id === selectedTable)?.customer_name && (
+                              <span className="flex items-center gap-1">
+                                <Users className="w-4 h-4" />
+                                {tableTabs.find(t => t.id === selectedTable)?.customer_name}
+                              </span>
+                            )}
+                            {tableTabs.find(t => t.id === selectedTable)?.opened_at && (
+                              <span className="flex items-center gap-1 mt-1">
+                                <Clock className="w-4 h-4" />
+                                Aberta às {new Date(tableTabs.find(t => t.id === selectedTable)?.opened_at || '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </CardDescription>
+                        </div>
+                        <Badge className={getTableStatusColor(tableTabs.find(t => t.id === selectedTable)?.status || '')}>
+                          {getTableStatusLabel(tableTabs.find(t => t.id === selectedTable)?.status || '')}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {(() => {
+                        const table = tableTabs.find(t => t.id === selectedTable)
+                        if (!table) return null
+
+                        if (table.status === 'available') {
+                          return (
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="customer-name">Nome do Cliente (opcional)</Label>
+                                <Input
+                                  id="customer-name"
+                                  placeholder="Ex: João Silva"
+                                  value={tableCustomerName}
+                                  onChange={(e) => setTableCustomerName(e.target.value)}
+                                />
+                              </div>
+                              <Button 
+                                className="w-full" 
+                                onClick={() => openTable(table.id)}
+                              >
+                                <Users className="w-4 h-4 mr-2" />
+                                Abrir Mesa
+                              </Button>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div className="space-y-4">
+                            {/* Lista de Itens */}
+                            <div>
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-semibold">Itens da Comanda</h4>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => setAddingItemToTable(!addingItemToTable)}
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Adicionar Item
+                                </Button>
+                              </div>
+
+                              {addingItemToTable && (
+                                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                  <p className="text-sm text-gray-600 mb-2">Selecione um produto:</p>
+                                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                    {products.filter((p: any) => p.visible).map((product: any) => (
+                                      <Button
+                                        key={product.id}
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-left justify-start h-auto py-2"
+                                        onClick={() => {
+                                          addItemToTable(table.id, product)
+                                          setAddingItemToTable(false)
+                                        }}
+                                      >
+                                        <div>
+                                          <p className="font-medium text-xs">{product.name}</p>
+                                          <p className="text-xs text-gray-500">R$ {Number(product.price).toFixed(2)}</p>
+                                        </div>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {table.items && table.items.length > 0 ? (
+                                <div className="space-y-2">
+                                  {table.items.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                      <div className="flex-1">
+                                        <p className="font-medium">{item.name}</p>
+                                        <p className="text-sm text-gray-600">
+                                          R$ {Number(item.price).toFixed(2)} x {item.quantity}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(table.id, item.id, item.quantity - 1)}
+                                        >
+                                          -
+                                        </Button>
+                                        <span className="w-8 text-center">{item.quantity}</span>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateItemQuantity(table.id, item.id, item.quantity + 1)}
+                                        >
+                                          +
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => removeItemFromTable(table.id, item.id)}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-gray-500 text-center py-4">
+                                  Nenhum item na comanda
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Total */}
+                            <div className="border-t pt-4">
+                              <div className="flex justify-between items-center text-lg font-bold">
+                                <span>Total:</span>
+                                <span>R$ {Number(table.total || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
+
+                            {/* Ações */}
+                            <div className="flex gap-2 pt-4">
+                              {table.status === 'occupied' && (
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1"
+                                  onClick={() => markTableForPayment(table.id)}
+                                >
+                                  <CreditCard className="w-4 h-4 mr-2" />
+                                  Solicitar Pagamento
+                                </Button>
+                              )}
+                              <Button 
+                                variant="destructive" 
+                                className="flex-1"
+                                onClick={() => closeTable(table.id)}
+                              >
+                                <X className="w-4 h-4 mr-2" />
+                                Fechar Mesa
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Resumo Lateral */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Resumo das Mesas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700">Disponíveis</span>
+                      <Badge variant="outline" className="bg-green-100 text-green-800">
+                        {tableTabs.filter(t => t.status === 'available').length}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700">Ocupadas</span>
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                        {tableTabs.filter(t => t.status === 'occupied').length}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                      <span className="text-yellow-700">Aguardando Pagamento</span>
+                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                        {tableTabs.filter(t => t.status === 'pending_payment').length}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Faturamento das Mesas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-600">
+                      R$ {tableTabs
+                        .filter(t => t.status !== 'available')
+                        .reduce((sum, t) => sum + Number(t.total || 0), 0)
+                        .toFixed(2)}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Total em mesas ocupadas
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
