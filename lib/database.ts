@@ -37,6 +37,8 @@ export interface Order {
     quantity: number
     extras?: Array<{ name: string; price: number }>
   }>
+  subtotal?: number
+  delivery_fee?: number
   total: number
   status: string
   created_at?: string
@@ -227,6 +229,8 @@ export async function createOrder(order: Omit<Order, "id" | "created_at" | "upda
       payment_method: order.payment_method || null,
       notes: order.notes || null,
       items: order.items,
+      subtotal: order.subtotal || 0,
+      delivery_fee: order.delivery_fee || 0,
       total: order.total,
       status: order.status,
     })
