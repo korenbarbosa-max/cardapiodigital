@@ -3850,7 +3850,7 @@ const handleSaveDeliveryConfig = () => {
                       <UtensilsCrossed className="w-5 h-5" />
                       Comandas de Mesas
                     </CardTitle>
-                    <CardDescription>Gerencie as 8 mesas do restaurante</CardDescription>
+                    <CardDescription>Gerencie as 40 mesas do restaurante</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
