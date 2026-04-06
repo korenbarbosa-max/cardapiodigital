@@ -521,7 +521,7 @@ export default function AdminPanel() {
           }
         })
 
-        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pendente")
+        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pendente" || o.status === "aguardando_pix")
         if (previousOrdersCountRef.current > 0 && pendingOrders.length > previousOrdersCountRef.current) {
           playNotificationSound()
         }
@@ -1366,7 +1366,7 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const stats = {
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + order.total, 0),
-    pendingOrders: orders.filter((order) => order.status === "pendente").length,
+    pendingOrders: orders.filter((order) => order.status === "pendente" || order.status === "aguardando_pix").length,
   }
 
   const cashSummary = getCashSummary()
@@ -2328,17 +2328,20 @@ const handleSaveDeliveryConfig = () => {
                             </CardDescription>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge
-                              variant={
-                                order.status === "pendente"
-                                  ? "destructive"
-                                  : order.status === "preparando"
-                                    ? "default"
-                                    : "secondary"
-                              }
-                            >
-                              {order.status}
-                            </Badge>
+<Badge
+                          variant={
+                            order.status === "aguardando_pix"
+                              ? "default"
+                              : order.status === "pendente"
+                                ? "destructive"
+                                : order.status === "preparando"
+                                  ? "default"
+                                  : "secondary"
+                          }
+                          className={order.status === "aguardando_pix" ? "bg-purple-600" : ""}
+                        >
+                          {order.status === "aguardando_pix" ? "Aguardando PIX" : order.status}
+                        </Badge>
                             <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
                               <Printer className="w-4 h-4" />
                             </Button>
@@ -2423,7 +2426,17 @@ const handleSaveDeliveryConfig = () => {
                           </div>
                         </div>
 
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
+                          {order.status === "aguardando_pix" && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => updateOrderStatus(order.id, "pendente")}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              PIX Confirmado
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -3637,7 +3650,7 @@ const handleSaveDeliveryConfig = () => {
                       </div>
                       <div className="text-2xl font-bold">{orders.length}</div>
                       <p className="text-xs text-gray-500">
-                        {orders.filter((o) => o.status === "pendente").length} pendentes
+                        {orders.filter((o) => o.status === "pendente" || o.status === "aguardando_pix").length} pendentes
                       </p>
                     </div>
 
