@@ -19,6 +19,7 @@ import {
   User,
   MessageCircle,
   CheckCircle,
+  Check,
 } from "lucide-react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
@@ -524,6 +525,59 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
     setShowCheckout(true)
   }
 
+  const handlePixPayment = async () => {
+    if (Object.keys(cart).length === 0) return
+
+    const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
+    const orderData = {
+      customer_name: customerData.name,
+      customer_phone: customerData.phone,
+      customer_address: customerData.address,
+      payment_method: "pix",
+      notes: isPreOrderNow ? `[ENCOMENDA] ${customerData.observations}` : customerData.observations,
+      is_pre_order: isPreOrderNow,
+      items: Object.entries(cart).map(([cartKey, cartItem]) => {
+        const itemId = Number.parseInt(cartKey.split("-")[0])
+        const item = visibleProducts.find((item) => item.id === itemId)
+        return {
+          id: itemId,
+          name: item?.name,
+          price: item?.price,
+          quantity: cartItem.quantity,
+          extras: cartItem.extras,
+        }
+      }),
+      subtotal: getCartTotal(),
+      delivery_fee: getDeliveryFee(),
+      total: getOrderTotal(),
+      status: "aguardando_pix",
+    }
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok) {
+        setLastOrder(responseData)
+      } else {
+        setLastOrder({ id: Date.now(), ...orderData })
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao salvar pedido PIX:", error)
+      setLastOrder({ id: Date.now(), ...orderData })
+    }
+
+    setCart({})
+    setShowCheckout(false)
+    setShowPixQRCode(false)
+    setShowOrderSuccess(true)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
@@ -848,12 +902,19 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className={`w-16 h-16 ${lastOrder.status === "aguardando_pix" ? "bg-purple-100" : "bg-green-100"} rounded-full flex items-center justify-center`}>
+                  <CheckCircle className={`w-8 h-8 ${lastOrder.status === "aguardando_pix" ? "text-purple-600" : "text-green-600"}`} />
                 </div>
               </div>
-              <CardTitle className="text-xl text-green-600">Pedido Realizado!</CardTitle>
-              <CardDescription>Seu pedido #{lastOrder.id} foi registrado com sucesso.</CardDescription>
+              <CardTitle className={`text-xl ${lastOrder.status === "aguardando_pix" ? "text-purple-600" : "text-green-600"}`}>
+                {lastOrder.status === "aguardando_pix" ? "Aguardando Confirmacao PIX" : "Pedido Realizado!"}
+              </CardTitle>
+              <CardDescription>
+                {lastOrder.status === "aguardando_pix" 
+                  ? `Pedido #${lastOrder.id} registrado. Aguardando confirmacao do pagamento PIX.`
+                  : `Seu pedido #${lastOrder.id} foi registrado com sucesso.`
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
@@ -893,7 +954,10 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                Seu pedido já foi registrado e pode ser acompanhado pela área administrativa.
+                {lastOrder.status === "aguardando_pix" 
+                  ? "Seu pedido sera confirmado assim que verificarmos o pagamento PIX."
+                  : "Seu pedido ja foi registrado e pode ser acompanhado pela area administrativa."
+                }
               </p>
             </CardContent>
           </Card>
@@ -1041,8 +1105,18 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                       <p className="font-bold text-xl text-orange-700">R$ {getOrderTotal().toFixed(2)}</p>
                     </div>
 
-                    <p className="text-xs text-gray-500 text-center mt-3">
-                      Apos o pagamento, clique em Confirmar Pedido
+                    <button
+                      type="button"
+                      onClick={handlePixPayment}
+                      disabled={!customerData.name || !customerData.phone || !customerData.address}
+                      className="w-full mt-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-5 h-5" />
+                      Ja Paguei - Confirmar Pedido
+                    </button>
+
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                      Seu pedido sera confirmado apos verificarmos o pagamento
                     </p>
                   </div>
                 )}
