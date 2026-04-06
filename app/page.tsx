@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
+import { QRCodeSVG } from "qrcode.react"
 
 const StripeCheckout = dynamic(() => import("@/components/stripe-checkout"), {
   ssr: false,
@@ -70,6 +71,11 @@ export default function DigitalMenu() {
 
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [showStripeCheckout, setShowStripeCheckout] = useState(false)
+  const [showPixQRCode, setShowPixQRCode] = useState(false)
+
+  // Configuração PIX
+  const PIX_KEY = "31995485349"
+  const PIX_NAME = "Cardapio Digital"
 
   useEffect(() => {
     const loadData = async () => {
@@ -994,7 +1000,10 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => setCustomerData({ ...customerData, paymentMethod: option.value })}
+                      onClick={() => {
+                        setCustomerData({ ...customerData, paymentMethod: option.value })
+                        setShowPixQRCode(option.value === "pix")
+                      }}
                       className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
                         customerData.paymentMethod === option.value
                           ? "border-orange-500 bg-orange-50 text-orange-700"
@@ -1005,6 +1014,38 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                     </button>
                   ))}
                 </div>
+
+                {/* QR Code PIX */}
+                {showPixQRCode && customerData.paymentMethod === "pix" && (
+                  <div className="mt-4 p-4 bg-gradient-to-b from-purple-50 to-white rounded-xl border-2 border-purple-200">
+                    <p className="text-center text-purple-700 font-medium mb-3">Escaneie o QR Code para pagar:</p>
+                    
+                    <div className="flex justify-center mb-4">
+                      <div className="bg-white p-3 rounded-xl shadow-md">
+                        <QRCodeSVG 
+                          value={`00020126580014BR.GOV.BCB.PIX0114+55${PIX_KEY}5204000053039865404${getOrderTotal().toFixed(2)}5802BR5913${PIX_NAME}6009SAO PAULO62070503***6304`}
+                          size={180}
+                          level="H"
+                          includeMargin={true}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-100 rounded-lg p-3 text-center mb-3">
+                      <p className="text-xs text-purple-600 mb-1">Chave PIX (Celular)</p>
+                      <p className="font-mono font-bold text-purple-800">{PIX_KEY}</p>
+                    </div>
+
+                    <div className="bg-orange-100 rounded-lg p-3 text-center">
+                      <p className="text-xs text-orange-600 mb-1">Valor a pagar</p>
+                      <p className="font-bold text-xl text-orange-700">R$ {getOrderTotal().toFixed(2)}</p>
+                    </div>
+
+                    <p className="text-xs text-gray-500 text-center mt-3">
+                      Apos o pagamento, clique em Confirmar Pedido
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
