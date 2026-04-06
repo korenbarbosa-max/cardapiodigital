@@ -1640,10 +1640,40 @@ Confirma o fechamento?
     const table = tableTabs.find(t => t.id === tableId)
     if (!table) return
 
-    if (table.items.length > 0 && table.total > 0 && !paymentMethod) {
-      if (!confirm(`Tem certeza que deseja fechar a Mesa ${table.table_number}?\n\nTotal: R$ ${table.total.toFixed(2)}`)) {
+    // Salva os valores ANTES de fechar a mesa
+    const tableTotal = Number(table.total) || 0
+    const tableNumber = table.table_number
+    const finalPaymentMethod = paymentMethod || table.payment_method || "dinheiro"
+
+    if (table.items.length > 0 && tableTotal > 0 && !paymentMethod) {
+      if (!confirm(`Tem certeza que deseja fechar a Mesa ${tableNumber}?\n\nTotal: R$ ${tableTotal.toFixed(2)}`)) {
         return
       }
+    }
+
+    // Registra a transação no caixa ANTES de fechar a mesa (se houver valor e caixa estiver aberto)
+    if (tableTotal > 0 && cashSession) {
+      try {
+        console.log("[v0] Registrando no caixa - Mesa:", tableNumber, "Valor:", tableTotal, "Metodo:", finalPaymentMethod)
+        const cashResponse = await fetch("/api/cash", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "entrada",
+            amount: tableTotal,
+            description: `Mesa ${tableNumber} - ${finalPaymentMethod.toUpperCase()}`,
+            payment_method: finalPaymentMethod,
+          }),
+        })
+        console.log("[v0] Resposta do caixa:", cashResponse.ok, cashResponse.status)
+        if (cashResponse.ok) {
+          await loadCashTransactions()
+        }
+      } catch (cashError) {
+        console.error("[v0] Erro ao registrar no caixa:", cashError)
+      }
+    } else {
+      console.log("[v0] Nao registrou no caixa - tableTotal:", tableTotal, "cashSession:", !!cashSession)
     }
 
     try {
@@ -1654,33 +1684,11 @@ Confirma o fechamento?
           id: tableId,
           status: "available",
           closeTable: true,
-          payment_method: paymentMethod || table.payment_method,
+          payment_method: finalPaymentMethod,
         }),
       })
 
       if (response.ok) {
-        // Registra a transação no caixa se houver valor e caixa estiver aberto
-        const tableTotal = Number(table.total) || 0
-        const finalPaymentMethod = paymentMethod || table.payment_method || "dinheiro"
-        
-        if (tableTotal > 0 && cashSession) {
-          try {
-            await fetch("/api/cash", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                type: "entrada",
-                amount: tableTotal,
-                description: `Mesa ${table.table_number} - ${finalPaymentMethod.toUpperCase()}`,
-                payment_method: finalPaymentMethod,
-              }),
-            })
-            await loadCashTransactions()
-          } catch (cashError) {
-            console.error("Erro ao registrar no caixa:", cashError)
-          }
-        }
-        
         await loadTableTabs()
         setSelectedTable(null)
       }
