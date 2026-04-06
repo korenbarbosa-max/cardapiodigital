@@ -58,20 +58,32 @@ export async function PUT(request: NextRequest) {
     if (body.items !== undefined) updateData.items = body.items
     if (body.total !== undefined) updateData.total = body.total
     if (body.customer_name !== undefined) updateData.customer_name = body.customer_name
+    if (body.payment_method !== undefined) updateData.payment_method = body.payment_method
     
     // Set opened_at when occupying table
     if (body.status === "occupied" && body.openTable) {
       updateData.opened_at = new Date().toISOString()
       updateData.closed_at = null
+      updateData.payment_method = null
     }
     
-    // Set closed_at when closing table
-    if (body.status === "available" && body.closeTable) {
+    // Set closed_at when closing table with payment (status = "closed")
+    // This preserves the data for reporting purposes
+    if (body.closeTable) {
+      updateData.status = "closed"
       updateData.closed_at = new Date().toISOString()
+      // Keep items, total, and payment_method for reporting
+    }
+    
+    // Reset table to available (after it was closed, for reuse)
+    if (body.resetTable) {
+      updateData.status = "available"
       updateData.items = []
       updateData.total = 0
       updateData.customer_name = null
       updateData.opened_at = null
+      updateData.closed_at = null
+      updateData.payment_method = null
     }
 
     const { data, error } = await supabase
