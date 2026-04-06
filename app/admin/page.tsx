@@ -450,12 +450,13 @@ export default function AdminPanel() {
   const [tableTabs, setTableTabs] = useState<Array<{
     id: number
     table_number: number
-    status: 'available' | 'occupied' | 'pending_payment'
+    status: 'available' | 'occupied' | 'pending_payment' | 'closed'
     items: Array<{ id: number; name: string; price: number; quantity: number; extras?: Array<{ name: string; price: number }> }>
     total: number
     customer_name: string | null
     opened_at: string | null
     closed_at: string | null
+    payment_method?: string | null
   }>>([])
   const [selectedTable, setSelectedTable] = useState<number | null>(null)
   const [tableCustomerName, setTableCustomerName] = useState("")
@@ -512,6 +513,10 @@ export default function AdminPanel() {
             total: order.total,
             status: order.status,
             timestamp: orderDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            created_at: order.created_at,
+            // Campos diretos para facilitar acesso nos filtros
+            customer_address: order.customer_address || "",
+            payment_method: order.payment_method || "",
             customer: {
               name: order.customer_name || "",
               phone: order.customer_phone || "",
@@ -1640,10 +1645,15 @@ Confirma o fechamento?
     const table = tableTabs.find(t => t.id === tableId)
     if (!table) return
 
+    // Se a mesa tem itens e total > 0, precisa passar pelo modal de pagamento
     if (table.items.length > 0 && table.total > 0) {
-      if (!confirm(`Tem certeza que deseja fechar a Mesa ${table.table_number}?\n\nTotal: R$ ${table.total.toFixed(2)}`)) {
-        return
-      }
+      openPaymentModal(tableId)
+      return
+    }
+
+    // Mesa vazia ou sem valor - pode fechar direto (reset)
+    if (!confirm(`Deseja liberar a Mesa ${table.table_number}?`)) {
+      return
     }
 
     try {
@@ -1652,8 +1662,7 @@ Confirma o fechamento?
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: tableId,
-          status: "available",
-          closeTable: true,
+          resetTable: true,
         }),
       })
 
@@ -1663,6 +1672,33 @@ Confirma o fechamento?
       }
     } catch (error) {
       console.error("Erro ao fechar mesa:", error)
+    }
+  }
+
+  const resetTable = async (tableId: number) => {
+    const table = tableTabs.find(t => t.id === tableId)
+    if (!table) return
+
+    if (!confirm(`Liberar a Mesa ${table.table_number} para novos clientes?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tableId,
+          resetTable: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+        setSelectedTable(null)
+      }
+    } catch (error) {
+      console.error("Erro ao liberar mesa:", error)
     }
   }
 
@@ -1790,27 +1826,41 @@ Confirma o fechamento?
     if (!paymentTableId) return
 
     try {
-      // Primeiro marca a mesa como pending_payment
-      const response = await fetch("/api/table-tabs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: paymentTableId,
-          status: "pending_payment",
-          payment_method: method,
-        }),
-      })
+      if (method === "pix") {
+        // Se for PIX, marca como pending_payment e mostra o QR code
+        const response = await fetch("/api/table-tabs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: paymentTableId,
+            status: "pending_payment",
+            payment_method: method,
+          }),
+        })
 
-      if (response.ok) {
-        await loadTableTabs()
-        
-        // Se for dinheiro ou cartão, fecha direto
-        if (method === "dinheiro" || method === "cartao") {
+        if (response.ok) {
+          await loadTableTabs()
+          setSelectedPaymentMethod(method)
+        }
+      } else {
+        // Se for dinheiro ou cartão, fecha a mesa direto com o método de pagamento
+        const response = await fetch("/api/table-tabs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: paymentTableId,
+            payment_method: method,
+            closeTable: true,
+          }),
+        })
+
+        if (response.ok) {
+          await loadTableTabs()
           setShowPaymentModal(false)
           setPaymentTableId(null)
           setSelectedPaymentMethod(null)
+          alert(`Mesa fechada com sucesso! Pagamento: ${method === "dinheiro" ? "Dinheiro" : "Cartão"}`)
         }
-        // Se for PIX, mantém modal aberto para mostrar QR
       }
     } catch (error) {
       console.error("Erro ao processar pagamento:", error)
@@ -1820,11 +1870,27 @@ Confirma o fechamento?
   const finishPixPayment = async () => {
     if (!paymentTableId) return
     
-    // Fecha a mesa após confirmação do PIX
-    await closeTable(paymentTableId)
-    setShowPaymentModal(false)
-    setPaymentTableId(null)
-    setSelectedPaymentMethod(null)
+    try {
+      // Fecha a mesa após confirmação do PIX (já tem o payment_method salvo)
+      const response = await fetch("/api/table-tabs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: paymentTableId,
+          closeTable: true,
+        }),
+      })
+
+      if (response.ok) {
+        await loadTableTabs()
+        setShowPaymentModal(false)
+        setPaymentTableId(null)
+        setSelectedPaymentMethod(null)
+        alert("Mesa fechada com sucesso! Pagamento: PIX")
+      }
+    } catch (error) {
+      console.error("Erro ao finalizar pagamento PIX:", error)
+    }
   }
 
   const getTableStatusColor = (status: string) => {
@@ -1832,6 +1898,7 @@ Confirma o fechamento?
       case 'available': return 'bg-green-100 text-green-800 border-green-300'
       case 'occupied': return 'bg-blue-100 text-blue-800 border-blue-300'
       case 'pending_payment': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+      case 'closed': return 'bg-gray-100 text-gray-500 border-gray-300'
       default: return 'bg-gray-100 text-gray-800 border-gray-300'
     }
   }
@@ -1841,6 +1908,7 @@ Confirma o fechamento?
       case 'available': return 'Disponível'
       case 'occupied': return 'Ocupada'
       case 'pending_payment': return 'Aguardando Pagamento'
+      case 'closed': return 'Fechada'
       default: return status
     }
   }
@@ -3971,7 +4039,7 @@ const handleSaveDeliveryConfig = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {tableTabs.map((table) => (
+                      {tableTabs.filter(t => t.status !== 'closed').map((table) => (
                         <div
                           key={table.id}
                           onClick={() => setSelectedTable(table.id)}
@@ -4014,6 +4082,51 @@ const handleSaveDeliveryConfig = () => {
                         <span className="text-sm">Aguardando Pagamento</span>
                       </div>
                     </div>
+
+                    {/* Mesas Fechadas do Dia */}
+                    {(() => {
+                      const today = new Date().toISOString().split("T")[0]
+                      const closedTables = tableTabs.filter(t => {
+                        const closeDate = t.closed_at ? new Date(t.closed_at).toISOString().split("T")[0] : ""
+                        return t.status === 'closed' && closeDate === today
+                      })
+                      
+                      if (closedTables.length === 0) return null
+                      
+                      return (
+                        <div className="mt-6 pt-4 border-t">
+                          <h4 className="font-semibold mb-3 text-gray-700">Mesas Fechadas Hoje ({closedTables.length})</h4>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {closedTables.map((table) => (
+                              <div 
+                                key={table.id}
+                                className="p-3 rounded-lg bg-gray-50 border border-gray-200 text-sm"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">Mesa {table.table_number}</span>
+                                  <Badge variant="outline" className="text-xs bg-gray-100">
+                                    {table.payment_method === 'dinheiro' ? 'Dinheiro' : 
+                                     table.payment_method === 'cartao' ? 'Cartão' : 
+                                     table.payment_method === 'pix' ? 'PIX' : '-'}
+                                  </Badge>
+                                </div>
+                                <div className="text-gray-600 mt-1">
+                                  R$ {Number(table.total || 0).toFixed(2)}
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="w-full mt-2 text-xs"
+                                  onClick={() => resetTable(table.id)}
+                                >
+                                  Liberar Mesa
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </CardContent>
                 </Card>
 
@@ -4169,24 +4282,48 @@ const handleSaveDeliveryConfig = () => {
 
                             {/* Ações */}
                             <div className="flex gap-2 pt-4">
-                              {table.status === 'occupied' && (
+                              {table.status === 'closed' ? (
+                                // Mesa fechada - só pode liberar
                                 <Button 
-                                  variant="outline" 
+                                  variant="default" 
                                   className="flex-1"
-                                  onClick={() => openPaymentModal(table.id)}
+                                  onClick={() => resetTable(table.id)}
                                 >
-                                  <CreditCard className="w-4 h-4 mr-2" />
-                                  Solicitar Pagamento
+                                  <Check className="w-4 h-4 mr-2" />
+                                  Liberar Mesa
                                 </Button>
+                              ) : (
+                                <>
+                                  {table.status === 'occupied' && (
+                                    <Button 
+                                      variant="outline" 
+                                      className="flex-1"
+                                      onClick={() => openPaymentModal(table.id)}
+                                    >
+                                      <CreditCard className="w-4 h-4 mr-2" />
+                                      Solicitar Pagamento
+                                    </Button>
+                                  )}
+                                  {table.status === 'pending_payment' && (
+                                    <Button 
+                                      variant="default" 
+                                      className="flex-1"
+                                      onClick={() => openPaymentModal(table.id)}
+                                    >
+                                      <CreditCard className="w-4 h-4 mr-2" />
+                                      Finalizar Pagamento
+                                    </Button>
+                                  )}
+                                  <Button 
+                                    variant="destructive" 
+                                    className="flex-1"
+                                    onClick={() => closeTable(table.id)}
+                                  >
+                                    <X className="w-4 h-4 mr-2" />
+                                    Fechar Mesa
+                                  </Button>
+                                </>
                               )}
-                              <Button 
-                                variant="destructive" 
-                                className="flex-1"
-                                onClick={() => closeTable(table.id)}
-                              >
-                                <X className="w-4 h-4 mr-2" />
-                                Fechar Mesa
-                              </Button>
                             </div>
                           </div>
                         )
@@ -4221,6 +4358,16 @@ const handleSaveDeliveryConfig = () => {
                         {tableTabs.filter(t => t.status === 'pending_payment').length}
                       </Badge>
                     </div>
+                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <span className="text-gray-700">Fechadas (Hoje)</span>
+                      <Badge variant="outline" className="bg-gray-100 text-gray-800">
+                        {tableTabs.filter(t => {
+                          const today = new Date().toISOString().split("T")[0]
+                          const closeDate = t.closed_at ? new Date(t.closed_at).toISOString().split("T")[0] : ""
+                          return t.status === 'closed' && closeDate === today
+                        }).length}
+                      </Badge>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -4231,7 +4378,7 @@ const handleSaveDeliveryConfig = () => {
                   <CardContent>
                     <div className="text-3xl font-bold text-green-600">
                       R$ {tableTabs
-                        .filter(t => t.status !== 'available')
+                        .filter(t => t.status === 'occupied' || t.status === 'pending_payment')
                         .reduce((sum, t) => sum + Number(t.total || 0), 0)
                         .toFixed(2)}
                     </div>
