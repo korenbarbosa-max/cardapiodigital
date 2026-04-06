@@ -803,10 +803,7 @@ export default function AdminPanel() {
   }
 
 const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    // Atualiza localmente primeiro para feedback imediato
-    setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
-    
-    // Persiste no banco de dados
+    // Persiste no banco de dados primeiro
     try {
       const response = await fetch("/api/orders", {
         method: "PUT",
@@ -816,13 +813,16 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
         body: JSON.stringify({ id: orderId, status: newStatus }),
       })
       
-      if (!response.ok) {
+      if (response.ok) {
+        // Atualiza localmente após sucesso do servidor
+        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+      } else {
         console.error("Erro ao atualizar status do pedido no servidor")
-        // Reverte em caso de erro
-        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: order.status } : order)))
+        alert("Erro ao atualizar status. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro ao atualizar status do pedido:", error)
+      alert("Erro ao atualizar status. Tente novamente.")
     }
   }
 
