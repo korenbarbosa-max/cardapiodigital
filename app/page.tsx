@@ -1080,7 +1080,9 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                 </div>
 
                 {/* QR Code PIX */}
-                {customerData.paymentMethod === "pix" && (
+                {customerData.paymentMethod === "pix" && (() => {
+                  console.log("[v0] PIX selecionado, mostrando QR code")
+                  return (
                   <div className="mt-4 p-4 bg-gradient-to-b from-purple-50 to-white rounded-xl border-2 border-purple-200">
                     <p className="text-center text-purple-700 font-medium mb-3">Escaneie o QR Code para pagar:</p>
                     
@@ -1119,7 +1121,8 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                       Seu pedido sera confirmado apos verificarmos o pagamento
                     </p>
                   </div>
-                )}
+                  )
+                })()}
               </div>
 
               <div>
