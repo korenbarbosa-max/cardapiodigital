@@ -1652,7 +1652,7 @@ Confirma o fechamento?
     }
 
     // Registra a transação no caixa ANTES de fechar a mesa (se houver valor e caixa estiver aberto)
-    if (tableTotal > 0 && cashSession) {
+    if (tableTotal > 0 && cashSession?.isOpen) {
       try {
         console.log("[v0] Registrando no caixa - Mesa:", tableNumber, "Valor:", tableTotal, "Metodo:", finalPaymentMethod)
         const cashResponse = await fetch("/api/cash", {
@@ -1673,7 +1673,7 @@ Confirma o fechamento?
         console.error("[v0] Erro ao registrar no caixa:", cashError)
       }
     } else {
-      console.log("[v0] Nao registrou no caixa - tableTotal:", tableTotal, "cashSession:", !!cashSession)
+      console.log("[v0] Nao registrou no caixa - tableTotal:", tableTotal, "cashSession:", !!cashSession, "isOpen:", cashSession?.isOpen)
     }
 
     try {
