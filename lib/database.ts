@@ -50,8 +50,9 @@ export interface CashTransaction {
   type: "entrada" | "saida" | "balance"
   amount: number
   description?: string
+  payment_method?: string
   created_at?: string
-}
+  }
 
 export interface Extra {
   id?: number
@@ -280,6 +281,7 @@ export async function createCashTransaction(
       type: transaction.type,
       amount: transaction.amount,
       description: transaction.description || null,
+      payment_method: transaction.payment_method || "dinheiro",
     })
     .select()
     .single()

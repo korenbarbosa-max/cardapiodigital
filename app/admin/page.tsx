@@ -1636,11 +1636,11 @@ Confirma o fechamento?
     }
   }
 
-  const closeTable = async (tableId: number) => {
+  const closeTable = async (tableId: number, paymentMethod?: string) => {
     const table = tableTabs.find(t => t.id === tableId)
     if (!table) return
 
-    if (table.items.length > 0 && table.total > 0) {
+    if (table.items.length > 0 && table.total > 0 && !paymentMethod) {
       if (!confirm(`Tem certeza que deseja fechar a Mesa ${table.table_number}?\n\nTotal: R$ ${table.total.toFixed(2)}`)) {
         return
       }
@@ -1654,10 +1654,33 @@ Confirma o fechamento?
           id: tableId,
           status: "available",
           closeTable: true,
+          payment_method: paymentMethod || table.payment_method,
         }),
       })
 
       if (response.ok) {
+        // Registra a transação no caixa se houver valor e caixa estiver aberto
+        const tableTotal = Number(table.total) || 0
+        const finalPaymentMethod = paymentMethod || table.payment_method || "dinheiro"
+        
+        if (tableTotal > 0 && cashSession) {
+          try {
+            await fetch("/api/cash", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "entrada",
+                amount: tableTotal,
+                description: `Mesa ${table.table_number} - ${finalPaymentMethod.toUpperCase()}`,
+                payment_method: finalPaymentMethod,
+              }),
+            })
+            await loadCashTransactions()
+          } catch (cashError) {
+            console.error("Erro ao registrar no caixa:", cashError)
+          }
+        }
+        
         await loadTableTabs()
         setSelectedTable(null)
       }
@@ -1790,27 +1813,27 @@ Confirma o fechamento?
     if (!paymentTableId) return
 
     try {
-      // Primeiro marca a mesa como pending_payment
-      const response = await fetch("/api/table-tabs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: paymentTableId,
-          status: "pending_payment",
-          payment_method: method,
-        }),
-      })
+      // Se for dinheiro ou cartão, fecha a mesa direto com o método de pagamento
+      if (method === "dinheiro" || method === "cartao") {
+        await closeTable(paymentTableId, method)
+        setShowPaymentModal(false)
+        setPaymentTableId(null)
+        setSelectedPaymentMethod(null)
+      } else {
+        // Se for PIX, marca como pending_payment e mantém modal aberto para mostrar QR
+        const response = await fetch("/api/table-tabs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: paymentTableId,
+            status: "pending_payment",
+            payment_method: method,
+          }),
+        })
 
-      if (response.ok) {
-        await loadTableTabs()
-        
-        // Se for dinheiro ou cartão, fecha direto
-        if (method === "dinheiro" || method === "cartao") {
-          setShowPaymentModal(false)
-          setPaymentTableId(null)
-          setSelectedPaymentMethod(null)
+        if (response.ok) {
+          await loadTableTabs()
         }
-        // Se for PIX, mantém modal aberto para mostrar QR
       }
     } catch (error) {
       console.error("Erro ao processar pagamento:", error)
@@ -1820,8 +1843,8 @@ Confirma o fechamento?
   const finishPixPayment = async () => {
     if (!paymentTableId) return
     
-    // Fecha a mesa após confirmação do PIX
-    await closeTable(paymentTableId)
+    // Fecha a mesa após confirmação do PIX com método "pix"
+    await closeTable(paymentTableId, "pix")
     setShowPaymentModal(false)
     setPaymentTableId(null)
     setSelectedPaymentMethod(null)
