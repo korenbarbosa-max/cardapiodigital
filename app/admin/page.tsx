@@ -45,10 +45,11 @@ import {
   Trash,
   Volume2,
   VolumeX,
-  UtensilsCrossed,
+UtensilsCrossed,
   Clock,
   Users,
-} from "lucide-react"
+  Truck,
+  } from "lucide-react"
 import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
 
@@ -521,7 +522,7 @@ export default function AdminPanel() {
           }
         })
 
-        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pendente")
+        const pendingOrders = convertedOrders.filter((o: any) => o.status === "pendente" || o.status === "aguardando_pix")
         if (previousOrdersCountRef.current > 0 && pendingOrders.length > previousOrdersCountRef.current) {
           playNotificationSound()
         }
@@ -803,10 +804,7 @@ export default function AdminPanel() {
   }
 
 const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    // Atualiza localmente primeiro para feedback imediato
-    setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
-    
-    // Persiste no banco de dados
+    // Persiste no banco de dados primeiro
     try {
       const response = await fetch("/api/orders", {
         method: "PUT",
@@ -816,13 +814,16 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
         body: JSON.stringify({ id: orderId, status: newStatus }),
       })
       
-      if (!response.ok) {
+      if (response.ok) {
+        // Atualiza localmente após sucesso do servidor
+        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)))
+      } else {
         console.error("Erro ao atualizar status do pedido no servidor")
-        // Reverte em caso de erro
-        setOrders((prev) => prev.map((order) => (order.id === orderId ? { ...order, status: order.status } : order)))
+        alert("Erro ao atualizar status. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro ao atualizar status do pedido:", error)
+      alert("Erro ao atualizar status. Tente novamente.")
     }
   }
 
@@ -1366,7 +1367,7 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
   const stats = {
     totalOrders: orders.length,
     totalRevenue: orders.reduce((sum, order) => sum + order.total, 0),
-    pendingOrders: orders.filter((order) => order.status === "pendente").length,
+    pendingOrders: orders.filter((order) => order.status === "pendente" || order.status === "aguardando_pix").length,
   }
 
   const cashSummary = getCashSummary()
@@ -2328,17 +2329,20 @@ const handleSaveDeliveryConfig = () => {
                             </CardDescription>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge
-                              variant={
-                                order.status === "pendente"
-                                  ? "destructive"
-                                  : order.status === "preparando"
-                                    ? "default"
-                                    : "secondary"
-                              }
-                            >
-                              {order.status}
-                            </Badge>
+<Badge
+                          variant={
+                            order.status === "aguardando_pix"
+                              ? "default"
+                              : order.status === "pendente"
+                                ? "destructive"
+                                : order.status === "preparando"
+                                  ? "default"
+                                  : "secondary"
+                          }
+                          className={order.status === "aguardando_pix" ? "bg-purple-600" : ""}
+                        >
+                          {order.status === "aguardando_pix" ? "Aguardando PIX" : order.status}
+                        </Badge>
                             <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
                               <Printer className="w-4 h-4" />
                             </Button>
@@ -2423,7 +2427,17 @@ const handleSaveDeliveryConfig = () => {
                           </div>
                         </div>
 
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
+                          {order.status === "aguardando_pix" && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => updateOrderStatus(order.id, "pendente")}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              PIX Confirmado
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -3323,6 +3337,109 @@ const handleSaveDeliveryConfig = () => {
                           </div>
                         </div>
 
+                        {/* Resumo de Vendas do Dia */}
+                        {(() => {
+                          const today = new Date().toISOString().split("T")[0]
+                          const todayOrders = orders.filter(order => {
+                            const orderDate = order.created_at ? new Date(order.created_at).toISOString().split("T")[0] : ""
+                            return orderDate === today && (order.status === "entregue" || order.status === "pago")
+                          })
+                          
+                          // Separar delivery (pedidos com endereço) e mesas (comandas fechadas)
+                          const deliveryOrders = todayOrders.filter(o => o.customer_address && o.customer_address.length > 0)
+                          const deliveryTotal = deliveryOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+                          const deliveryDinheiro = deliveryOrders.filter(o => o.payment_method === "dinheiro").reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+                          const deliveryCartao = deliveryOrders.filter(o => o.payment_method?.includes("cartao")).reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+                          const deliveryPix = deliveryOrders.filter(o => o.payment_method === "pix").reduce((sum, o) => sum + (Number(o.total) || 0), 0)
+                          
+                          // Mesas (comandas fechadas do dia)
+                          const closedTables = tableTabs.filter(t => {
+                            const closeDate = t.closed_at ? new Date(t.closed_at).toISOString().split("T")[0] : ""
+                            return closeDate === today && t.status === "closed"
+                          })
+                          const mesasTotal = closedTables.reduce((sum, t) => sum + (Number(t.total) || 0), 0)
+                          const mesasDinheiro = closedTables.filter(t => t.payment_method === "dinheiro").reduce((sum, t) => sum + (Number(t.total) || 0), 0)
+                          const mesasCartao = closedTables.filter(t => t.payment_method === "cartao").reduce((sum, t) => sum + (Number(t.total) || 0), 0)
+                          const mesasPix = closedTables.filter(t => t.payment_method === "pix").reduce((sum, t) => sum + (Number(t.total) || 0), 0)
+
+                          return (
+                            <div className="border-t pt-4 mt-4">
+                              <h4 className="font-semibold mb-4 flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-green-600" />
+                                Resumo de Vendas do Dia
+                              </h4>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Delivery */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                  <h5 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                    <Truck className="w-4 h-4" />
+                                    Delivery
+                                  </h5>
+                                  <div className="text-2xl font-bold text-blue-700 mb-3">
+                                    R$ {deliveryTotal.toFixed(2)}
+                                  </div>
+                                  <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between text-green-700">
+                                      <span>Dinheiro:</span>
+                                      <span className="font-medium">R$ {deliveryDinheiro.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-blue-700">
+                                      <span>Cartao:</span>
+                                      <span className="font-medium">R$ {deliveryCartao.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-purple-700">
+                                      <span>PIX:</span>
+                                      <span className="font-medium">R$ {deliveryPix.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-blue-200 text-xs text-blue-600">
+                                    {deliveryOrders.length} pedido(s)
+                                  </div>
+                                </div>
+
+                                {/* Mesas */}
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                  <h5 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                    <Users className="w-4 h-4" />
+                                    Mesas
+                                  </h5>
+                                  <div className="text-2xl font-bold text-orange-700 mb-3">
+                                    R$ {mesasTotal.toFixed(2)}
+                                  </div>
+                                  <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between text-green-700">
+                                      <span>Dinheiro:</span>
+                                      <span className="font-medium">R$ {mesasDinheiro.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-blue-700">
+                                      <span>Cartao:</span>
+                                      <span className="font-medium">R$ {mesasCartao.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-purple-700">
+                                      <span>PIX:</span>
+                                      <span className="font-medium">R$ {mesasPix.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-orange-200 text-xs text-orange-600">
+                                    {closedTables.length} mesa(s) fechada(s)
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Total Geral */}
+                              <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-semibold text-green-800">Total Geral do Dia:</span>
+                                  <span className="text-2xl font-bold text-green-700">
+                                    R$ {(deliveryTotal + mesasTotal).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
+
                         {/* Formulário de Fechamento */}
                         <div className="border-t pt-4 mt-4 space-y-4">
                           <h4 className="font-semibold">Fechar Caixa</h4>
@@ -3637,7 +3754,7 @@ const handleSaveDeliveryConfig = () => {
                       </div>
                       <div className="text-2xl font-bold">{orders.length}</div>
                       <p className="text-xs text-gray-500">
-                        {orders.filter((o) => o.status === "pendente").length} pendentes
+                        {orders.filter((o) => o.status === "pendente" || o.status === "aguardando_pix").length} pendentes
                       </p>
                     </div>
 
