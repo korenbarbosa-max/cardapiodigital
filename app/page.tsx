@@ -19,8 +19,20 @@ import {
   User,
   MessageCircle,
   CheckCircle,
+  Check,
 } from "lucide-react"
 import Link from "next/link"
+import dynamic from "next/dynamic"
+import { QRCodeSVG } from "qrcode.react"
+
+const StripeCheckout = dynamic(() => import("@/components/stripe-checkout"), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+    </div>
+  ),
+})
 
 export default function DigitalMenu() {
   const [cart, setCart] = useState<{ [key: string]: { quantity: number; extras: { name: string; price: number }[] } }>(
@@ -59,6 +71,12 @@ export default function DigitalMenu() {
   })
 
   const [isPreOrder, setIsPreOrder] = useState(false)
+  const [showStripeCheckout, setShowStripeCheckout] = useState(false)
+  const [showPixQRCode, setShowPixQRCode] = useState(false)
+
+  // Configuração PIX
+  const PIX_KEY = "31995485349"
+  const PIX_NAME = "Cardapio Digital"
 
   useEffect(() => {
     const loadData = async () => {
@@ -445,6 +463,121 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
     }, 3000)
   }
 
+  const handleStripePayment = () => {
+    if (Object.keys(cart).length === 0) return
+    setShowCheckout(false)
+    setShowStripeCheckout(true)
+  }
+
+  const handleStripeSuccess = async (sessionId: string) => {
+    const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
+    const orderData = {
+      customer_name: customerData.name,
+      customer_phone: customerData.phone,
+      customer_address: customerData.address,
+      payment_method: "cartao-online",
+      notes: isPreOrderNow ? `[ENCOMENDA] ${customerData.observations}` : customerData.observations,
+      is_pre_order: isPreOrderNow,
+      stripe_session_id: sessionId,
+      items: Object.entries(cart).map(([cartKey, cartItem]) => {
+        const itemId = Number.parseInt(cartKey.split("-")[0])
+        const item = visibleProducts.find((item) => item.id === itemId)
+        return {
+          id: itemId,
+          name: item?.name,
+          price: item?.price,
+          quantity: cartItem.quantity,
+          extras: cartItem.extras,
+        }
+      }),
+      subtotal: getCartTotal(),
+      delivery_fee: getDeliveryFee(),
+      total: getOrderTotal(),
+      status: "pago",
+    }
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok) {
+        setLastOrder(responseData)
+      } else {
+        setLastOrder({ id: Date.now(), ...orderData })
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao salvar pedido:", error)
+      setLastOrder({ id: Date.now(), ...orderData })
+    }
+
+    setCart({})
+    setShowStripeCheckout(false)
+    setShowOrderSuccess(true)
+  }
+
+  const handleStripeCancel = () => {
+    setShowStripeCheckout(false)
+    setShowCheckout(true)
+  }
+
+  const handlePixPayment = async () => {
+    if (Object.keys(cart).length === 0) return
+
+    const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
+    const orderData = {
+      customer_name: customerData.name,
+      customer_phone: customerData.phone,
+      customer_address: customerData.address,
+      payment_method: "pix",
+      notes: isPreOrderNow ? `[ENCOMENDA] ${customerData.observations}` : customerData.observations,
+      is_pre_order: isPreOrderNow,
+      items: Object.entries(cart).map(([cartKey, cartItem]) => {
+        const itemId = Number.parseInt(cartKey.split("-")[0])
+        const item = visibleProducts.find((item) => item.id === itemId)
+        return {
+          id: itemId,
+          name: item?.name,
+          price: item?.price,
+          quantity: cartItem.quantity,
+          extras: cartItem.extras,
+        }
+      }),
+      subtotal: getCartTotal(),
+      delivery_fee: getDeliveryFee(),
+      total: getOrderTotal(),
+      status: "aguardando_pix",
+    }
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok) {
+        setLastOrder(responseData)
+      } else {
+        setLastOrder({ id: Date.now(), ...orderData })
+      }
+    } catch (error) {
+      console.error("[v0] Erro ao salvar pedido PIX:", error)
+      setLastOrder({ id: Date.now(), ...orderData })
+    }
+
+    setCart({})
+    setShowCheckout(false)
+    setShowPixQRCode(false)
+    setShowOrderSuccess(true)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center">
@@ -769,12 +902,19 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className={`w-16 h-16 ${lastOrder.status === "aguardando_pix" ? "bg-purple-100" : "bg-green-100"} rounded-full flex items-center justify-center`}>
+                  <CheckCircle className={`w-8 h-8 ${lastOrder.status === "aguardando_pix" ? "text-purple-600" : "text-green-600"}`} />
                 </div>
               </div>
-              <CardTitle className="text-xl text-green-600">Pedido Realizado!</CardTitle>
-              <CardDescription>Seu pedido #{lastOrder.id} foi registrado com sucesso.</CardDescription>
+              <CardTitle className={`text-xl ${lastOrder.status === "aguardando_pix" ? "text-purple-600" : "text-green-600"}`}>
+                {lastOrder.status === "aguardando_pix" ? "Aguardando Confirmacao PIX" : "Pedido Realizado!"}
+              </CardTitle>
+              <CardDescription>
+                {lastOrder.status === "aguardando_pix" 
+                  ? `Pedido #${lastOrder.id} registrado. Aguardando confirmacao do pagamento PIX.`
+                  : `Seu pedido #${lastOrder.id} foi registrado com sucesso.`
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
@@ -814,7 +954,10 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                Seu pedido já foi registrado e pode ser acompanhado pela área administrativa.
+                {lastOrder.status === "aguardando_pix" 
+                  ? "Seu pedido sera confirmado assim que verificarmos o pagamento PIX."
+                  : "Seu pedido ja foi registrado e pode ser acompanhado pela area administrativa."
+                }
               </p>
             </CardContent>
           </Card>
@@ -912,15 +1055,19 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
 
                 <div className="grid grid-cols-2 gap-2">
                   {[
+                    { value: "cartao-online", label: "Cartao Online", online: true },
                     { value: "dinheiro", label: "Dinheiro" },
                     { value: "pix", label: "PIX" },
-                    { value: "cartao-debito", label: "Cartão Débito" },
-                    { value: "cartao-credito", label: "Cartão Crédito" },
+                    { value: "cartao-debito", label: "Cartao Debito" },
+                    { value: "cartao-credito", label: "Cartao Credito" },
                   ].map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => setCustomerData({ ...customerData, paymentMethod: option.value })}
+                      onClick={() => {
+                        setCustomerData({ ...customerData, paymentMethod: option.value })
+                        setShowPixQRCode(option.value === "pix")
+                      }}
                       className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
                         customerData.paymentMethod === option.value
                           ? "border-orange-500 bg-orange-50 text-orange-700"
@@ -931,6 +1078,51 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                     </button>
                   ))}
                 </div>
+
+                {/* QR Code PIX */}
+                {customerData.paymentMethod === "pix" && (() => {
+                  console.log("[v0] PIX selecionado, mostrando QR code")
+                  return (
+                  <div className="mt-4 p-4 bg-gradient-to-b from-purple-50 to-white rounded-xl border-2 border-purple-200">
+                    <p className="text-center text-purple-700 font-medium mb-3">Escaneie o QR Code para pagar:</p>
+                    
+                    <div className="flex justify-center mb-4">
+                      <div className="bg-white p-3 rounded-xl shadow-md">
+                        <QRCodeSVG 
+                          value={`00020126580014BR.GOV.BCB.PIX0114+55${PIX_KEY}5204000053039865404${getOrderTotal().toFixed(2)}5802BR5913${PIX_NAME}6009SAO PAULO62070503***6304`}
+                          size={180}
+                          level="H"
+                          includeMargin={true}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-100 rounded-lg p-3 text-center mb-3">
+                      <p className="text-xs text-purple-600 mb-1">Chave PIX (Celular)</p>
+                      <p className="font-mono font-bold text-purple-800">{PIX_KEY}</p>
+                    </div>
+
+                    <div className="bg-orange-100 rounded-lg p-3 text-center">
+                      <p className="text-xs text-orange-600 mb-1">Valor a pagar</p>
+                      <p className="font-bold text-xl text-orange-700">R$ {getOrderTotal().toFixed(2)}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handlePixPayment}
+                      disabled={!customerData.name || !customerData.phone || !customerData.address}
+                      className="w-full mt-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-5 h-5" />
+                      Ja Paguei - Confirmar Pedido
+                    </button>
+
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                      Seu pedido sera confirmado apos verificarmos o pagamento
+                    </p>
+                  </div>
+                  )
+                })()}
               </div>
 
               <div>
@@ -989,19 +1181,31 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
               </div>
 
 <div className="flex space-x-2 pt-4">
-  <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setShowCheckout(false)}>
-  Cancelar
-  </Button>
-  <Button
-  className={`flex-1 ${!isStoreOpen() && scheduleConfig.allowPreOrder ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'}`}
-  onClick={handleFinishOrder}
-  disabled={
-  !customerData.name || !customerData.phone || !customerData.address || !customerData.paymentMethod || (!isStoreOpen() && !scheduleConfig.allowPreOrder)
-  }
-  >
-  {!isStoreOpen() && scheduleConfig.allowPreOrder ? 'Fazer Encomenda' : 'Confirmar Pedido'}
-  </Button>
-  </div>
+                <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setShowCheckout(false)}>
+                  Cancelar
+                </Button>
+                {customerData.paymentMethod === "cartao-online" ? (
+                  <Button
+                    className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    onClick={handleStripePayment}
+                    disabled={
+                      !customerData.name || !customerData.phone || !customerData.address || (!isStoreOpen() && !scheduleConfig.allowPreOrder)
+                    }
+                  >
+                    Pagar com Cartao
+                  </Button>
+                ) : (
+                  <Button
+                    className={`flex-1 ${!isStoreOpen() && scheduleConfig.allowPreOrder ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700' : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'}`}
+                    onClick={handleFinishOrder}
+                    disabled={
+                      !customerData.name || !customerData.phone || !customerData.address || !customerData.paymentMethod || (!isStoreOpen() && !scheduleConfig.allowPreOrder)
+                    }
+                  >
+                    {!isStoreOpen() && scheduleConfig.allowPreOrder ? 'Fazer Encomenda' : 'Confirmar Pedido'}
+                  </Button>
+                )}
+              </div>
   {!isStoreOpen() && (
     <p className={`text-xs text-center mt-2 ${scheduleConfig.allowPreOrder ? 'text-orange-600' : 'text-red-600'}`}>
       {scheduleConfig.allowPreOrder 
@@ -1088,6 +1292,32 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
             </div>
           )
         })()}
+
+      {showStripeCheckout && (
+        <StripeCheckout
+          items={Object.entries(cart).map(([cartKey, cartItem]) => {
+            const itemId = Number.parseInt(cartKey.split("-")[0])
+            const item = visibleProducts.find((item) => item.id === itemId)
+            return {
+              id: itemId,
+              name: item?.name || "",
+              price: item?.price || 0,
+              quantity: cartItem.quantity,
+              extras: cartItem.extras,
+            }
+          })}
+          subtotal={getCartTotal()}
+          deliveryFee={getDeliveryFee()}
+          total={getOrderTotal()}
+          customerName={customerData.name}
+          customerPhone={customerData.phone}
+          customerAddress={customerData.address}
+          observations={customerData.observations}
+          isPreOrder={!isStoreOpen() && scheduleConfig.allowPreOrder}
+          onSuccess={handleStripeSuccess}
+          onCancel={handleStripeCancel}
+        />
+      )}
     </div>
   )
 }

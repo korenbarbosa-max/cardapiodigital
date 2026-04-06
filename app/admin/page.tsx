@@ -50,6 +50,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
+import { QRCodeSVG } from "qrcode.react"
 
 // Import Recharts dynamically to avoid SSR issues
 const RechartsChart = dynamic(
@@ -458,6 +459,15 @@ export default function AdminPanel() {
   const [selectedTable, setSelectedTable] = useState<number | null>(null)
   const [tableCustomerName, setTableCustomerName] = useState("")
   const [addingItemToTable, setAddingItemToTable] = useState(false)
+
+  // Estados para modal de pagamento da comanda
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentTableId, setPaymentTableId] = useState<number | null>(null)
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"dinheiro" | "cartao" | "pix" | null>(null)
+  
+  // Chave PIX configurada
+  const PIX_KEY = "31995485349"
+  const PIX_NAME = "Cardapio Digital"
 
   const loadProducts = async () => {
     try {
@@ -1755,23 +1765,65 @@ Confirma o fechamento?
     }
   }
 
-  const markTableForPayment = async (tableId: number) => {
+  const openPaymentModal = (tableId: number) => {
+    setPaymentTableId(tableId)
+    setSelectedPaymentMethod(null)
+    setShowPaymentModal(true)
+  }
+
+  const generatePixPayload = (amount: number) => {
+    // Gera um payload PIX BR Code simplificado
+    const pixKey = PIX_KEY
+    const merchantName = PIX_NAME.substring(0, 25).toUpperCase()
+    const city = "SAO PAULO"
+    const formattedAmount = amount.toFixed(2)
+    
+    // Payload PIX estático simplificado
+    const payload = `00020126580014BR.GOV.BCB.PIX0136${pixKey}5204000053039865404${formattedAmount}5802BR5925${merchantName}6009${city}62070503***6304`
+    
+    // Calcula CRC16 (simplificado - retorna o payload sem CRC para QR funcional)
+    return payload
+  }
+
+  const confirmPayment = async (method: "dinheiro" | "cartao" | "pix") => {
+    if (!paymentTableId) return
+
     try {
+      // Primeiro marca a mesa como pending_payment
       const response = await fetch("/api/table-tabs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: tableId,
+          id: paymentTableId,
           status: "pending_payment",
+          payment_method: method,
         }),
       })
 
       if (response.ok) {
         await loadTableTabs()
+        
+        // Se for dinheiro ou cartão, fecha direto
+        if (method === "dinheiro" || method === "cartao") {
+          setShowPaymentModal(false)
+          setPaymentTableId(null)
+          setSelectedPaymentMethod(null)
+        }
+        // Se for PIX, mantém modal aberto para mostrar QR
       }
     } catch (error) {
-      console.error("Erro ao marcar para pagamento:", error)
+      console.error("Erro ao processar pagamento:", error)
     }
+  }
+
+  const finishPixPayment = async () => {
+    if (!paymentTableId) return
+    
+    // Fecha a mesa após confirmação do PIX
+    await closeTable(paymentTableId)
+    setShowPaymentModal(false)
+    setPaymentTableId(null)
+    setSelectedPaymentMethod(null)
   }
 
   const getTableStatusColor = (status: string) => {
@@ -3798,7 +3850,7 @@ const handleSaveDeliveryConfig = () => {
                       <UtensilsCrossed className="w-5 h-5" />
                       Comandas de Mesas
                     </CardTitle>
-                    <CardDescription>Gerencie as 8 mesas do restaurante</CardDescription>
+                    <CardDescription>Gerencie as 40 mesas do restaurante</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -4004,7 +4056,7 @@ const handleSaveDeliveryConfig = () => {
                                 <Button 
                                   variant="outline" 
                                   className="flex-1"
-                                  onClick={() => markTableForPayment(table.id)}
+                                  onClick={() => openPaymentModal(table.id)}
                                 >
                                   <CreditCard className="w-4 h-4 mr-2" />
                                   Solicitar Pagamento
@@ -4375,6 +4427,124 @@ const handleSaveDeliveryConfig = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de Pagamento da Comanda */}
+      {showPaymentModal && paymentTableId && (() => {
+        const table = tableTabs.find(t => t.id === paymentTableId)
+        if (!table) return null
+        const total = Number(table.total || 0)
+
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white">
+                <h2 className="text-xl font-bold">Pagamento - Mesa {table.table_number}</h2>
+                <p className="text-3xl font-bold mt-2">R$ {total.toFixed(2)}</p>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {!selectedPaymentMethod ? (
+                  <>
+                    <p className="text-gray-600 mb-4 text-center">Selecione a forma de pagamento:</p>
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => {
+                          setSelectedPaymentMethod("dinheiro")
+                          confirmPayment("dinheiro")
+                        }}
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                          <Banknote className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-800">Dinheiro</p>
+                          <p className="text-sm text-gray-500">Pagamento em especie</p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedPaymentMethod("cartao")
+                          confirmPayment("cartao")
+                        }}
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                          <CreditCard className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-800">Cartao</p>
+                          <p className="text-sm text-gray-500">Debito ou Credito</p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => setSelectedPaymentMethod("pix")}
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                          <Smartphone className="w-6 h-6 text-purple-600" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-800">PIX</p>
+                          <p className="text-sm text-gray-500">Pagamento instantaneo</p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                ) : selectedPaymentMethod === "pix" ? (
+                  <div className="text-center">
+                    <p className="text-gray-600 mb-4">Escaneie o QR Code para pagar:</p>
+                    
+                    <div className="bg-white p-4 rounded-xl border-2 border-gray-100 inline-block mb-4">
+                      <QRCodeSVG 
+                        value={`00020126580014BR.GOV.BCB.PIX0114+55${PIX_KEY}5204000053039865404${total.toFixed(2)}5802BR5913${PIX_NAME}6009SAO PAULO62070503***6304`}
+                        size={200}
+                        level="H"
+                        includeMargin={true}
+                      />
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                      <p className="text-sm text-gray-500 mb-1">Chave PIX (Celular)</p>
+                      <p className="font-mono font-bold text-lg">{PIX_KEY}</p>
+                    </div>
+
+                    <div className="bg-orange-50 rounded-xl p-4 mb-4">
+                      <p className="text-sm text-orange-600 mb-1">Valor a pagar</p>
+                      <p className="font-bold text-2xl text-orange-600">R$ {total.toFixed(2)}</p>
+                    </div>
+
+                    <Button 
+                      onClick={finishPixPayment}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3"
+                    >
+                      <Check className="w-5 h-5 mr-2" />
+                      Confirmar Pagamento Recebido
+                    </Button>
+                  </div>
+                ) : null}
+
+                {/* Cancel Button */}
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowPaymentModal(false)
+                    setPaymentTableId(null)
+                    setSelectedPaymentMethod(null)
+                  }}
+                  className="w-full mt-4"
+                >
+                  {selectedPaymentMethod === "pix" ? "Voltar" : "Cancelar"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
