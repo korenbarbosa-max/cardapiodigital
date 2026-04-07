@@ -4206,23 +4206,33 @@ const handleSaveDeliveryConfig = () => {
                               {addingItemToTable && (
                                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                                   <p className="text-sm text-gray-600 mb-2">Selecione um produto:</p>
-                                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto">
                                     {products.filter((p: any) => p.visible).map((product: any) => (
-                                      <Button
+                                      <button
                                         key={product.id}
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-left justify-start h-auto py-2"
+                                        type="button"
+                                        className="flex flex-col items-center p-2 border border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-all cursor-pointer"
                                         onClick={() => {
                                           addItemToTable(table.id, product)
                                           setAddingItemToTable(false)
                                         }}
                                       >
-                                        <div>
-                                          <p className="font-medium text-xs">{product.name}</p>
-                                          <p className="text-xs text-gray-500">R$ {Number(product.price).toFixed(2)}</p>
+                                        <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                          {product.image ? (
+                                            <img 
+                                              src={product.image} 
+                                              alt={product.name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                              <Package className="w-6 h-6" />
+                                            </div>
+                                          )}
                                         </div>
-                                      </Button>
+                                        <p className="font-medium text-xs text-center line-clamp-2">{product.name}</p>
+                                        <p className="text-xs text-orange-600 font-semibold">R$ {Number(product.price).toFixed(2)}</p>
+                                      </button>
                                     ))}
                                   </div>
                                 </div>
