@@ -808,6 +808,52 @@ export default function AdminPanel() {
     alert("Credenciais alteradas com sucesso!")
   }
 
+  // Funcao auxiliar para registrar transacao no caixa automaticamente
+  const registerCashTransaction = async (
+    amount: number,
+    paymentMethod: string,
+    description: string,
+    type: "entrada" | "saida" = "entrada"
+  ) => {
+    if (!cashSession || !cashSession.isOpen) {
+      console.log("[v0] Caixa nao esta aberto - transacao nao registrada")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/cash-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          amount,
+          description,
+          paymentMethod,
+        }),
+      })
+
+      if (response.ok) {
+        const transaction = await response.json()
+        setCashTransactions((prev) => [
+          {
+            ...transaction,
+            paymentMethod,
+            timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            date: new Date(transaction.created_at).toISOString().split("T")[0],
+            isAutomatic: true,
+          },
+          ...prev,
+        ])
+        console.log("[v0] Transacao registrada no caixa:", description)
+      }
+    } catch (error) {
+      console.error("Erro ao registrar transacao no caixa:", error)
+    }
+  }
+
 const updateOrderStatus = async (orderId: number, newStatus: string) => {
     // Persiste no banco de dados primeiro
     try {
@@ -1631,52 +1677,6 @@ Confirma o fechamento?
 
     // Atualizar status do pedido para "processado"
     updateOrderStatus(order.id, "processado")
-  }
-
-  // Função auxiliar para registrar transação no caixa automaticamente
-  const registerCashTransaction = async (
-    amount: number,
-    paymentMethod: string,
-    description: string,
-    type: "entrada" | "saida" = "entrada"
-  ) => {
-    if (!cashSession.isOpen) {
-      console.log("[v0] Caixa não está aberto - transação não registrada")
-      return
-    }
-
-    try {
-      const response = await fetch("/api/cash-transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          amount,
-          description,
-          paymentMethod,
-        }),
-      })
-
-      if (response.ok) {
-        const transaction = await response.json()
-        setCashTransactions((prev) => [
-          {
-            ...transaction,
-            paymentMethod,
-            timestamp: new Date(transaction.created_at).toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            date: new Date(transaction.created_at).toISOString().split("T")[0],
-            isAutomatic: true,
-          },
-          ...prev,
-        ])
-        console.log("[v0] Transação registrada no caixa:", description)
-      }
-    } catch (error) {
-      console.error("Erro ao registrar transação no caixa:", error)
-    }
   }
 
   // Funções para Comandas de Mesas
