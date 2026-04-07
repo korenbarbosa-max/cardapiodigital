@@ -821,14 +821,14 @@ export default function AdminPanel() {
     }
 
     try {
-      const response = await fetch("/api/cash-transactions", {
+      const response = await fetch("/api/cash", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
           amount,
           description,
-          paymentMethod,
+          payment_method: paymentMethod,
         }),
       })
 
@@ -1906,6 +1906,9 @@ Confirma o fechamento?
         if (response.ok) {
           await loadTableTabs()
           setSelectedPaymentMethod(method)
+        } else {
+          console.error("Erro ao atualizar mesa para PIX")
+          alert("Erro ao processar pagamento. Tente novamente.")
         }
       } else {
         // Se for dinheiro ou cartão, fecha a mesa direto com o método de pagamento
@@ -1920,22 +1923,26 @@ Confirma o fechamento?
         })
 
         if (response.ok) {
-          // Registra a transação no caixa automaticamente
-          await registerCashTransaction(
+          // Registra a transação no caixa automaticamente (não bloqueia o fluxo)
+          registerCashTransaction(
             table.total,
             method,
             `Mesa ${table.table_number} - Comanda`
-          )
+          ).catch(err => console.error("Erro ao registrar transação:", err))
           
           await loadTableTabs()
           setShowPaymentModal(false)
           setPaymentTableId(null)
           setSelectedPaymentMethod(null)
           alert(`Mesa fechada com sucesso! Pagamento: ${method === "dinheiro" ? "Dinheiro" : "Cartão"}`)
+        } else {
+          console.error("Erro ao fechar mesa")
+          alert("Erro ao processar pagamento. Tente novamente.")
         }
       }
     } catch (error) {
       console.error("Erro ao processar pagamento:", error)
+      alert("Erro ao processar pagamento. Tente novamente.")
     }
   }
 
@@ -1957,21 +1964,25 @@ Confirma o fechamento?
       })
 
       if (response.ok) {
-        // Registra a transação no caixa automaticamente
-        await registerCashTransaction(
+        // Registra a transação no caixa automaticamente (não bloqueia o fluxo)
+        registerCashTransaction(
           table.total,
           "pix",
           `Mesa ${table.table_number} - Comanda`
-        )
+        ).catch(err => console.error("Erro ao registrar transação:", err))
         
         await loadTableTabs()
         setShowPaymentModal(false)
         setPaymentTableId(null)
         setSelectedPaymentMethod(null)
         alert("Mesa fechada com sucesso! Pagamento: PIX")
+      } else {
+        console.error("Erro ao fechar mesa PIX")
+        alert("Erro ao finalizar pagamento. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro ao finalizar pagamento PIX:", error)
+      alert("Erro ao finalizar pagamento. Tente novamente.")
     }
   }
 
