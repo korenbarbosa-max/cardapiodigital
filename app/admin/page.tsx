@@ -2478,8 +2478,34 @@ const handleSaveDeliveryConfig = () => {
                 <CardDescription>Visualize e gerencie todos os pedidos em tempo real</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {orders.map((order) => (
+                <Tabs defaultValue="delivery" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="delivery" className="flex items-center gap-2">
+                      <Truck className="w-4 h-4" />
+                      Delivery
+                      <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700">
+                        {orders.filter(o => o.customer_address && o.customer_address.length > 0).length}
+                      </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="mesas" className="flex items-center gap-2">
+                      <UtensilsCrossed className="w-4 h-4" />
+                      Mesas
+                      <Badge variant="secondary" className="ml-1 bg-orange-100 text-orange-700">
+                        {orders.filter(o => !o.customer_address || o.customer_address.length === 0).length}
+                      </Badge>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Pedidos de Delivery */}
+                  <TabsContent value="delivery">
+                    <div className="space-y-4">
+                      {orders.filter(o => o.customer_address && o.customer_address.length > 0).length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <Truck className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                          <p>Nenhum pedido de delivery no momento</p>
+                        </div>
+                      ) : (
+                        orders.filter(o => o.customer_address && o.customer_address.length > 0).map((order) => (
                     <Card key={order.id}>
                       <CardHeader>
                         <div className="flex justify-between items-center">
@@ -2626,8 +2652,165 @@ const handleSaveDeliveryConfig = () => {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
+                  ))
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Pedidos de Mesas */}
+                  <TabsContent value="mesas">
+                    <div className="space-y-4">
+                      {orders.filter(o => !o.customer_address || o.customer_address.length === 0).length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <UtensilsCrossed className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                          <p>Nenhum pedido de mesa no momento</p>
+                        </div>
+                      ) : (
+                        orders.filter(o => !o.customer_address || o.customer_address.length === 0).map((order) => (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <CardTitle className="text-lg">Pedido #{order.id}</CardTitle>
+                            <CardDescription>
+                              {order.mesa} • {order.timestamp}
+                            </CardDescription>
+                          </div>
+                          <div className="flex items-center space-x-2">
+<Badge
+                          variant={
+                            order.status === "aguardando_pix"
+                              ? "default"
+                              : order.status === "pendente"
+                                ? "destructive"
+                                : order.status === "preparando"
+                                  ? "default"
+                                  : "secondary"
+                          }
+                          className={order.status === "aguardando_pix" ? "bg-purple-600" : ""}
+                        >
+                          {order.status === "aguardando_pix" ? "Aguardando PIX" : order.status}
+                        </Badge>
+                            <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
+                              <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                              onClick={() => handleDeleteOrder(order.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="bg-gray-50 rounded-lg p-3 mb-4 space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="w-4 h-4 text-gray-500" />
+                            <span className="font-medium">Cliente:</span>
+                            <span>{order.customer?.name || "Não informado"}</span>
+                          </div>
+                          {order.customer?.phone && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Phone className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium">Telefone:</span>
+                              <span>{order.customer.phone}</span>
+                            </div>
+                          )}
+                          {order.customer?.paymentMethod && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <CreditCard className="w-4 h-4 text-gray-500" />
+                              <span className="font-medium">Pagamento:</span>
+                              <span>{order.customer.paymentMethod}</span>
+                            </div>
+                          )}
+                          {order.customer?.notes && (
+                            <div className="flex items-start gap-2 text-sm">
+                              <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
+                              <span className="font-medium">Obs:</span>
+                              <span>{order.customer.notes}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 mb-4">
+                          {order.items.map((item, index) => {
+                            const extrasTotal = item.extras && item.extras.length > 0
+                              ? item.extras.reduce((sum: number, extra: any) => sum + (extra.price || 0), 0)
+                              : 0
+                            const itemTotal = (item.price + extrasTotal) * item.quantity
+                            return (
+                              <div key={index}>
+                                <div className="flex justify-between">
+                                  <span>
+                                    {item.quantity}x {item.name}
+                                  </span>
+                                  <span>R$ {itemTotal.toFixed(2)}</span>
+                                </div>
+                                {item.extras && item.extras.length > 0 && (
+                                  <div className="ml-6 mt-1 space-y-0.5">
+                                    {item.extras.map((extra: any, extraIndex: number) => (
+                                      <div key={extraIndex} className="flex justify-between text-xs text-orange-600">
+                                        <span>+ {extra.name}</span>
+                                        <span>+ R$ {(extra.price || 0).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                          <div className="border-t pt-2 font-bold flex justify-between">
+                            <span>Total:</span>
+                            <span>R$ {order.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {order.status === "aguardando_pix" && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => updateOrderStatus(order.id, "pendente")}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              PIX Confirmado
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "preparando")}
+                            disabled={order.status !== "pendente"}
+                          >
+                            Preparar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "pronto")}
+                            disabled={order.status !== "preparando"}
+                          >
+                            Pronto
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateOrderStatus(order.id, "pago")}
+                            disabled={order.status !== "pronto"}
+                          >
+                            Pago
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
