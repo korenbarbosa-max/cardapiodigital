@@ -194,7 +194,12 @@ export default function DigitalMenu() {
   }
 
   const getDeliveryFee = () => {
+    // Só cobra taxa de entrega se:
+    // 1. A taxa estiver habilitada
+    // 2. O cliente preencheu um endereço (é delivery, não mesa)
     if (!deliveryConfig.enabled) return 0
+    if (!customerData.address || customerData.address.trim() === "") return 0
+    
     const cartTotal = getCartTotal()
     if (deliveryConfig.freeDeliveryMinimum > 0 && cartTotal >= deliveryConfig.freeDeliveryMinimum) {
       return 0
@@ -850,7 +855,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                         <span>Subtotal:</span>
                         <span>R$ {getCartTotal().toFixed(2)}</span>
                       </div>
-                      {deliveryConfig.enabled && (
+                      {deliveryConfig.enabled && customerData.address && customerData.address.trim() !== "" && (
                         <div className="flex justify-between items-center text-sm">
                           <span>Taxa de entrega:</span>
                           {getDeliveryFee() === 0 && deliveryConfig.freeDeliveryMinimum > 0 ? (
@@ -860,7 +865,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                           )}
                         </div>
                       )}
-                      {deliveryConfig.enabled && deliveryConfig.freeDeliveryMinimum > 0 && getDeliveryFee() > 0 && (
+                      {deliveryConfig.enabled && customerData.address && customerData.address.trim() !== "" && deliveryConfig.freeDeliveryMinimum > 0 && getDeliveryFee() > 0 && (
                         <p className="text-xs text-gray-500">
                           Frete grátis em pedidos acima de R$ {deliveryConfig.freeDeliveryMinimum.toFixed(2)}
                         </p>
@@ -1164,7 +1169,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
                   <span>Subtotal:</span>
                   <span>R$ {getCartTotal().toFixed(2)}</span>
                 </div>
-                {deliveryConfig.enabled && (
+                {deliveryConfig.enabled && customerData.address && customerData.address.trim() !== "" && (
                   <div className="flex justify-between text-sm">
                     <span>Taxa de entrega:</span>
                     {getDeliveryFee() === 0 && deliveryConfig.freeDeliveryMinimum > 0 ? (
