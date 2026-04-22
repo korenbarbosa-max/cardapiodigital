@@ -52,6 +52,8 @@ UtensilsCrossed,
   } from "lucide-react"
 import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
+import { FiscalTab } from "@/components/admin/fiscal-tab"
+import { EmitirNotaModal } from "@/components/admin/emitir-nota-modal"
 
 // Import Recharts dynamically to avoid SSR issues
 const RechartsChart = dynamic(
@@ -345,8 +347,22 @@ export default function AdminPanel() {
   const [editingCategory, setEditingCategory] = useState<number | null>(null)
   const [editCategoryName, setEditCategoryName] = useState("")
 
-  const [activeTab, setActiveTab] = useState("dashboard")
-
+const [activeTab, setActiveTab] = useState("dashboard")
+  
+  // Estado para modal de emissão de nota fiscal
+  const [emitirNotaModal, setEmitirNotaModal] = useState<{
+    open: boolean
+    orderId?: number
+    items: any[]
+    total: number
+    customerName?: string
+    customerPhone?: string
+  }>({
+    open: false,
+    items: [],
+    total: 0,
+  })
+  
   const [orders, setOrders] = useState(mockOrders)
   const [products, setProducts] = useState([])
   const [newProduct, setNewProduct] = useState({
@@ -2345,6 +2361,14 @@ const handleSaveDeliveryConfig = () => {
               <span className="sm:hidden">Mesas</span>
             </TabsTrigger>
             <TabsTrigger
+              value="fiscal"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <FileText className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Fiscal</span>
+              <span className="sm:hidden">NF</span>
+            </TabsTrigger>
+            <TabsTrigger
               value="settings"
               className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
             >
@@ -2506,6 +2530,22 @@ const handleSaveDeliveryConfig = () => {
                         </Badge>
                             <Button variant="outline" size="sm" onClick={() => printOrder(order.id)}>
                               <Printer className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-green-600 hover:bg-green-50 hover:text-green-700 border-green-200"
+                              onClick={() => setEmitirNotaModal({
+                                open: true,
+                                orderId: order.id,
+                                items: order.items,
+                                total: order.total,
+                                customerName: order.customer?.name,
+                                customerPhone: order.customer?.phone,
+                              })}
+                              title="Emitir Nota Fiscal"
+                            >
+                              <Receipt className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="outline"
@@ -4789,6 +4829,19 @@ const handleSaveDeliveryConfig = () => {
                     </div>
                   )}
                 </div>
+</CardContent>
+          </Card>
+          </TabsContent>
+
+          {/* Fiscal */}
+          <TabsContent value="fiscal">
+            <Card>
+              <CardHeader>
+                <CardTitle>Área Fiscal</CardTitle>
+                <CardDescription>Gerencie a emissão de notas fiscais eletrônicas (NF-e e NFC-e)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FiscalTab />
               </CardContent>
             </Card>
           </TabsContent>
@@ -4912,6 +4965,20 @@ const handleSaveDeliveryConfig = () => {
           </div>
         )
       })()}
+
+      {/* Modal de Emissão de Nota Fiscal */}
+      <EmitirNotaModal
+        open={emitirNotaModal.open}
+        onOpenChange={(open) => setEmitirNotaModal({ ...emitirNotaModal, open })}
+        orderId={emitirNotaModal.orderId}
+        items={emitirNotaModal.items}
+        total={emitirNotaModal.total}
+        customerName={emitirNotaModal.customerName}
+        customerPhone={emitirNotaModal.customerPhone}
+        onSuccess={(invoice) => {
+          console.log("Nota emitida:", invoice)
+        }}
+      />
     </div>
   )
 }
