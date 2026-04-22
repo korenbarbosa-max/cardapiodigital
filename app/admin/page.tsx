@@ -49,6 +49,11 @@ UtensilsCrossed,
   Clock,
   Users,
   Truck,
+  FileCheck,
+  Building2,
+  AlertCircle,
+  Loader2,
+  Download,
   } from "lucide-react"
 import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
@@ -467,6 +472,40 @@ export default function AdminPanel() {
   const [paymentTableId, setPaymentTableId] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<"dinheiro" | "cartao" | "pix" | null>(null)
   
+  // Estados para módulo fiscal (NFC-e)
+  const [fiscalConfig, setFiscalConfig] = useState<any>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [fiscalLoading, setFiscalLoading] = useState(false)
+  const [showFiscalConfigModal, setShowFiscalConfigModal] = useState(false)
+  const [showEmitirNFCeModal, setShowEmitirNFCeModal] = useState(false)
+  const [selectedOrderForNFCe, setSelectedOrderForNFCe] = useState<any>(null)
+  const [nfceFormData, setNfceFormData] = useState({
+    cpf_destinatario: "",
+    nome_destinatario: "",
+  })
+  const [fiscalConfigForm, setFiscalConfigForm] = useState({
+    cnpj: "",
+    razao_social: "",
+    nome_fantasia: "",
+    inscricao_estadual: "",
+    inscricao_municipal: "",
+    regime_tributario: "1",
+    cep: "",
+    logradouro: "",
+    numero: "",
+    complemento: "",
+    bairro: "",
+    cidade: "",
+    uf: "",
+    codigo_ibge: "",
+    serie_nfce: "1",
+    proximo_numero_nfce: "1",
+    ambiente: "homologacao",
+    api_token: "",
+    csc_id: "",
+    csc_token: "",
+  })
+  
   // Chave PIX configurada
   const PIX_KEY = "31995485349"
   const PIX_NAME = "Cardapio Digital"
@@ -664,6 +703,8 @@ export default function AdminPanel() {
 
       loadExtras() // Load product-specific extras from localStorage
       await loadGlobalExtras() // Load global extras from database
+      await loadFiscalConfig() // Load fiscal config
+      await loadInvoices() // Load invoices
 
       if (typeof window !== "undefined") {
         const savedCredentials = localStorage.getItem("admin_credentials")
@@ -1057,6 +1098,181 @@ const updateOrderStatus = async (orderId: number, newStatus: string) => {
       ...prev,
       extras: prev.extras.filter((_, i) => i !== index),
     }))
+  }
+
+  // Funções do módulo fiscal (NFC-e)
+  const loadFiscalConfig = async () => {
+    try {
+      const response = await fetch("/api/fiscal-config")
+      if (response.ok) {
+        const data = await response.json()
+        if (data) {
+          setFiscalConfig(data)
+          setFiscalConfigForm({
+            cnpj: data.cnpj || "",
+            razao_social: data.razao_social || "",
+            nome_fantasia: data.nome_fantasia || "",
+            inscricao_estadual: data.inscricao_estadual || "",
+            inscricao_municipal: data.inscricao_municipal || "",
+            regime_tributario: data.regime_tributario || "1",
+            cep: data.cep || "",
+            logradouro: data.logradouro || "",
+            numero: data.numero || "",
+            complemento: data.complemento || "",
+            bairro: data.bairro || "",
+            cidade: data.cidade || "",
+            uf: data.uf || "",
+            codigo_ibge: data.codigo_ibge || "",
+            serie_nfce: String(data.serie_nfce || 1),
+            proximo_numero_nfce: String(data.proximo_numero_nfce || 1),
+            ambiente: data.ambiente || "homologacao",
+            api_token: data.api_token || "",
+            csc_id: data.csc_id || "",
+            csc_token: data.csc_token || "",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configuração fiscal:", error)
+    }
+  }
+
+  const loadInvoices = async () => {
+    try {
+      const response = await fetch("/api/nfce")
+      if (response.ok) {
+        const data = await response.json()
+        setInvoices(data || [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar notas fiscais:", error)
+    }
+  }
+
+  const saveFiscalConfig = async () => {
+    setFiscalLoading(true)
+    try {
+      const response = await fetch("/api/fiscal-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fiscalConfigForm),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setFiscalConfig(data)
+        setShowFiscalConfigModal(false)
+        alert("Configuração fiscal salva com sucesso!")
+      } else {
+        alert("Erro ao salvar configuração fiscal")
+      }
+    } catch (error) {
+      console.error("Erro ao salvar configuração fiscal:", error)
+      alert("Erro ao salvar configuração fiscal")
+    } finally {
+      setFiscalLoading(false)
+    }
+  }
+
+  const emitirNFCe = async () => {
+    if (!selectedOrderForNFCe) return
+    
+    setFiscalLoading(true)
+    try {
+      const payload: any = {
+        cpf_destinatario: nfceFormData.cpf_destinatario,
+        nome_destinatario: nfceFormData.nome_destinatario,
+      }
+      
+      // Verifica se é um pedido ou comanda
+      if (selectedOrderForNFCe.table_number !== undefined) {
+        payload.table_tab_id = selectedOrderForNFCe.id
+      } else {
+        payload.order_id = selectedOrderForNFCe.id
+      }
+      
+      const response = await fetch("/api/nfce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        alert("NFC-e emitida com sucesso!")
+        loadInvoices()
+        setShowEmitirNFCeModal(false)
+        setSelectedOrderForNFCe(null)
+        setNfceFormData({ cpf_destinatario: "", nome_destinatario: "" })
+      } else {
+        alert(`Erro ao emitir NFC-e: ${data.focusnfe_response?.mensagem || data.error || "Erro desconhecido"}`)
+      }
+    } catch (error) {
+      console.error("Erro ao emitir NFC-e:", error)
+      alert("Erro ao emitir NFC-e")
+    } finally {
+      setFiscalLoading(false)
+    }
+  }
+
+  const consultarNFCe = async (ref: string) => {
+    setFiscalLoading(true)
+    try {
+      const response = await fetch(`/api/nfce?ref=${ref}`)
+      if (response.ok) {
+        const data = await response.json()
+        loadInvoices() // Recarrega a lista
+        alert(`Status: ${data.status}\n${data.mensagem || ""}`)
+      }
+    } catch (error) {
+      console.error("Erro ao consultar NFC-e:", error)
+    } finally {
+      setFiscalLoading(false)
+    }
+  }
+
+  const cancelarNFCe = async (ref: string) => {
+    const justificativa = prompt("Informe a justificativa do cancelamento (mínimo 15 caracteres):")
+    if (!justificativa || justificativa.length < 15) {
+      alert("A justificativa deve ter no mínimo 15 caracteres")
+      return
+    }
+    
+    setFiscalLoading(true)
+    try {
+      const response = await fetch(`/api/nfce?ref=${ref}&justificativa=${encodeURIComponent(justificativa)}`, {
+        method: "DELETE",
+      })
+      if (response.ok) {
+        alert("NFC-e cancelada com sucesso!")
+        loadInvoices()
+      } else {
+        alert("Erro ao cancelar NFC-e")
+      }
+    } catch (error) {
+      console.error("Erro ao cancelar NFC-e:", error)
+    } finally {
+      setFiscalLoading(false)
+    }
+  }
+
+  const openEmitirNFCeModal = (order: any) => {
+    setSelectedOrderForNFCe(order)
+    setNfceFormData({
+      cpf_destinatario: "",
+      nome_destinatario: order.customer_name || order.customer?.name || "",
+    })
+    setShowEmitirNFCeModal(true)
+  }
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case "autorizado": return "bg-green-100 text-green-800"
+      case "cancelado": return "bg-red-100 text-red-800"
+      case "rejeitado": return "bg-red-100 text-red-800"
+      case "processando": return "bg-yellow-100 text-yellow-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
   }
 
   const addNewProduct = async () => {
@@ -2351,6 +2567,14 @@ const handleSaveDeliveryConfig = () => {
               <Settings className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
               <span className="hidden sm:inline">Configurações</span>
               <span className="sm:hidden">Config</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="fiscal"
+              className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap flex-shrink-0"
+            >
+              <FileCheck className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">NFC-e</span>
+              <span className="sm:hidden">NF</span>
             </TabsTrigger>
           </TabsList>
 
@@ -4975,8 +5199,511 @@ const handleSaveDeliveryConfig = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* NFC-e / Fiscal */}
+          <TabsContent value="fiscal">
+            <div className="space-y-6">
+              {/* Status da Configuração */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5" />
+                        Configuração Fiscal
+                      </CardTitle>
+                      <CardDescription>
+                        Configure os dados da empresa para emissão de NFC-e
+                      </CardDescription>
+                    </div>
+                    <Button onClick={() => setShowFiscalConfigModal(true)}>
+                      <Settings className="w-4 h-4 mr-2" />
+                      {fiscalConfig ? "Editar" : "Configurar"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {fiscalConfig ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">CNPJ</p>
+                        <p className="font-medium">{fiscalConfig.cnpj || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">Razão Social</p>
+                        <p className="font-medium">{fiscalConfig.razao_social || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">Nome Fantasia</p>
+                        <p className="font-medium">{fiscalConfig.nome_fantasia || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">Inscrição Estadual</p>
+                        <p className="font-medium">{fiscalConfig.inscricao_estadual || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">Ambiente</p>
+                        <Badge className={fiscalConfig.ambiente === "producao" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                          {fiscalConfig.ambiente === "producao" ? "Produção" : "Homologação"}
+                        </Badge>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-500">Próxima NFC-e</p>
+                        <p className="font-medium">Série {fiscalConfig.serie_nfce} - Nº {fiscalConfig.proximo_numero_nfce}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
+                      <p className="text-gray-600">Configuração fiscal não encontrada.</p>
+                      <p className="text-sm text-gray-500">Configure os dados da empresa para emitir NFC-e.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Emitir NFC-e para Pedidos/Comandas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileCheck className="w-5 h-5" />
+                    Emitir NFC-e
+                  </CardTitle>
+                  <CardDescription>
+                    Selecione um pedido ou comanda para emitir a nota fiscal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="pedidos" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+                      <TabsTrigger value="comandas">Comandas</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="pedidos">
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {orders.filter(o => o.status === "pago" || o.status === "entregue").length === 0 ? (
+                          <p className="text-center text-gray-500 py-4">Nenhum pedido pago disponível</p>
+                        ) : (
+                          orders.filter(o => o.status === "pago" || o.status === "entregue").map((order: any) => (
+                            <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium">Pedido #{order.id}</p>
+                                <p className="text-sm text-gray-500">
+                                  {order.customer_name || "Cliente não identificado"} • R$ {Number(order.total).toFixed(2)}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => openEmitirNFCeModal(order)}
+                                disabled={!fiscalConfig || fiscalLoading}
+                              >
+                                <FileCheck className="w-4 h-4 mr-2" />
+                                Emitir NFC-e
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="comandas">
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {tableTabs.filter(t => t.status === "fechada").length === 0 ? (
+                          <p className="text-center text-gray-500 py-4">Nenhuma comanda fechada disponível</p>
+                        ) : (
+                          tableTabs.filter(t => t.status === "fechada").map((tab: any) => (
+                            <div key={tab.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium">Mesa {tab.table_number}</p>
+                                <p className="text-sm text-gray-500">
+                                  {tab.customer_name || "Cliente não identificado"} • R$ {Number(tab.total).toFixed(2)}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => openEmitirNFCeModal(tab)}
+                                disabled={!fiscalConfig || fiscalLoading}
+                              >
+                                <FileCheck className="w-4 h-4 mr-2" />
+                                Emitir NFC-e
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              {/* Lista de Notas Fiscais Emitidas */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Receipt className="w-5 h-5" />
+                        Notas Fiscais Emitidas
+                      </CardTitle>
+                      <CardDescription>
+                        Histórico de NFC-e emitidas
+                      </CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={loadInvoices} disabled={fiscalLoading}>
+                      {fiscalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Atualizar"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {invoices.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Receipt className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                      <p>Nenhuma nota fiscal emitida</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                      {invoices.map((invoice: any) => (
+                        <div key={invoice.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <p className="font-medium">
+                                  NFC-e #{invoice.numero} - Série {invoice.serie}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {invoice.destinatario_nome || "Consumidor Final"} • 
+                                  {invoice.data_emissao ? new Date(invoice.data_emissao).toLocaleString("pt-BR") : "-"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getStatusBadgeColor(invoice.status)}>
+                                {invoice.status}
+                              </Badge>
+                              <span className="font-bold">R$ {Number(invoice.valor_total).toFixed(2)}</span>
+                            </div>
+                          </div>
+                          
+                          {invoice.chave_acesso && (
+                            <p className="text-xs text-gray-400 mb-2 font-mono break-all">
+                              Chave: {invoice.chave_acesso}
+                            </p>
+                          )}
+                          
+                          <div className="flex gap-2 mt-3">
+                            {invoice.status === "autorizado" && invoice.danfe_url && (
+                              <Button size="sm" variant="outline" asChild>
+                                <a href={invoice.danfe_url} target="_blank" rel="noopener noreferrer">
+                                  <Download className="w-4 h-4 mr-1" />
+                                  DANFE
+                                </a>
+                              </Button>
+                            )}
+                            {invoice.status === "processando" && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => consultarNFCe(invoice.ref_api)}
+                                disabled={fiscalLoading}
+                              >
+                                Consultar Status
+                              </Button>
+                            )}
+                            {invoice.status === "autorizado" && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="text-red-600 hover:bg-red-50"
+                                onClick={() => cancelarNFCe(invoice.ref_api)}
+                                disabled={fiscalLoading}
+                              >
+                                Cancelar
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal de Configuração Fiscal */}
+      {showFiscalConfigModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white">
+              <h2 className="text-xl font-bold">Configuração Fiscal</h2>
+              <p className="text-blue-100">Dados da empresa para emissão de NFC-e</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <h3 className="font-semibold text-gray-700 mb-3">Dados da Empresa</h3>
+                </div>
+                
+                <div>
+                  <Label>CNPJ</Label>
+                  <Input
+                    value={fiscalConfigForm.cnpj}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, cnpj: e.target.value})}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+                <div>
+                  <Label>Razão Social</Label>
+                  <Input
+                    value={fiscalConfigForm.razao_social}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, razao_social: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Nome Fantasia</Label>
+                  <Input
+                    value={fiscalConfigForm.nome_fantasia}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, nome_fantasia: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Inscrição Estadual</Label>
+                  <Input
+                    value={fiscalConfigForm.inscricao_estadual}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, inscricao_estadual: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Inscrição Municipal</Label>
+                  <Input
+                    value={fiscalConfigForm.inscricao_municipal}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, inscricao_municipal: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Regime Tributário</Label>
+                  <Select value={fiscalConfigForm.regime_tributario} onValueChange={(v) => setFiscalConfigForm({...fiscalConfigForm, regime_tributario: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Simples Nacional</SelectItem>
+                      <SelectItem value="2">Simples Nacional - Excesso</SelectItem>
+                      <SelectItem value="3">Regime Normal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-2 mt-4">
+                  <h3 className="font-semibold text-gray-700 mb-3">Endereço</h3>
+                </div>
+                
+                <div>
+                  <Label>CEP</Label>
+                  <Input
+                    value={fiscalConfigForm.cep}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, cep: e.target.value})}
+                    placeholder="00000-000"
+                  />
+                </div>
+                <div>
+                  <Label>Logradouro</Label>
+                  <Input
+                    value={fiscalConfigForm.logradouro}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, logradouro: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Número</Label>
+                  <Input
+                    value={fiscalConfigForm.numero}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, numero: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Complemento</Label>
+                  <Input
+                    value={fiscalConfigForm.complemento}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, complemento: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Bairro</Label>
+                  <Input
+                    value={fiscalConfigForm.bairro}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, bairro: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Cidade</Label>
+                  <Input
+                    value={fiscalConfigForm.cidade}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, cidade: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>UF</Label>
+                  <Input
+                    value={fiscalConfigForm.uf}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, uf: e.target.value})}
+                    maxLength={2}
+                    placeholder="MG"
+                  />
+                </div>
+                <div>
+                  <Label>Código IBGE</Label>
+                  <Input
+                    value={fiscalConfigForm.codigo_ibge}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, codigo_ibge: e.target.value})}
+                    placeholder="3106200"
+                  />
+                </div>
+
+                <div className="md:col-span-2 mt-4">
+                  <h3 className="font-semibold text-gray-700 mb-3">Configuração NFC-e</h3>
+                </div>
+                
+                <div>
+                  <Label>Série NFC-e</Label>
+                  <Input
+                    type="number"
+                    value={fiscalConfigForm.serie_nfce}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, serie_nfce: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Próximo Número</Label>
+                  <Input
+                    type="number"
+                    value={fiscalConfigForm.proximo_numero_nfce}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, proximo_numero_nfce: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Ambiente</Label>
+                  <Select value={fiscalConfigForm.ambiente} onValueChange={(v) => setFiscalConfigForm({...fiscalConfigForm, ambiente: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="homologacao">Homologação (Testes)</SelectItem>
+                      <SelectItem value="producao">Produção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-2 mt-4">
+                  <h3 className="font-semibold text-gray-700 mb-3">API FocusNFe</h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Obtenha seu token em <a href="https://focusnfe.com.br" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">focusnfe.com.br</a>
+                  </p>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <Label>Token da API</Label>
+                  <Input
+                    type="password"
+                    value={fiscalConfigForm.api_token}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, api_token: e.target.value})}
+                    placeholder="Seu token FocusNFe"
+                  />
+                </div>
+                <div>
+                  <Label>CSC ID</Label>
+                  <Input
+                    value={fiscalConfigForm.csc_id}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, csc_id: e.target.value})}
+                    placeholder="ID do CSC"
+                  />
+                </div>
+                <div>
+                  <Label>CSC Token</Label>
+                  <Input
+                    type="password"
+                    value={fiscalConfigForm.csc_token}
+                    onChange={(e) => setFiscalConfigForm({...fiscalConfigForm, csc_token: e.target.value})}
+                    placeholder="Token CSC"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t p-4 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowFiscalConfigModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={saveFiscalConfig} disabled={fiscalLoading}>
+                {fiscalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Emitir NFC-e */}
+      {showEmitirNFCeModal && selectedOrderForNFCe && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 text-white">
+              <h2 className="text-xl font-bold">Emitir NFC-e</h2>
+              <p className="text-green-100">
+                {selectedOrderForNFCe.table_number !== undefined 
+                  ? `Mesa ${selectedOrderForNFCe.table_number}` 
+                  : `Pedido #${selectedOrderForNFCe.id}`}
+              </p>
+              <p className="text-2xl font-bold mt-2">R$ {Number(selectedOrderForNFCe.total).toFixed(2)}</p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <Label>CPF do Consumidor (opcional)</Label>
+                <Input
+                  value={nfceFormData.cpf_destinatario}
+                  onChange={(e) => setNfceFormData({...nfceFormData, cpf_destinatario: e.target.value})}
+                  placeholder="000.000.000-00"
+                />
+                <p className="text-xs text-gray-500 mt-1">Deixe em branco para consumidor final</p>
+              </div>
+              <div>
+                <Label>Nome do Consumidor (opcional)</Label>
+                <Input
+                  value={nfceFormData.nome_destinatario}
+                  onChange={(e) => setNfceFormData({...nfceFormData, nome_destinatario: e.target.value})}
+                  placeholder="Nome completo"
+                />
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                  A nota será emitida no ambiente de <strong>{fiscalConfig?.ambiente === "producao" ? "produção" : "homologação"}</strong>.
+                </p>
+              </div>
+            </div>
+            
+            <div className="border-t p-4 flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowEmitirNFCeModal(false)
+                  setSelectedOrderForNFCe(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={emitirNFCe} disabled={fiscalLoading}>
+                {fiscalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileCheck className="w-4 h-4 mr-2" />}
+                Emitir NFC-e
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Pagamento da Comanda */}
       {showPaymentModal && paymentTableId && (() => {
