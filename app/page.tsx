@@ -617,7 +617,7 @@ const isPreOrderNow = !isStoreOpen() && scheduleConfig.allowPreOrder
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center space-x-2 sm:space-x-4">
               <div className="flex items-center">
-                <img src="/logo-bom-pastel.png" alt="Bom Pastel" className="h-10 sm:h-12 w-auto" />
+                <img src="/images/logo.png" alt="Mega Lanches" className="h-10 sm:h-12 w-auto" />
               </div>
             </div>
 
